@@ -1,0 +1,138 @@
+/* --------------------------------------------------------------------------
+   Chrome only. Everything in the story itself is drawn on the canvas.
+   -------------------------------------------------------------------------- */
+
+/* If you receive the final display font as a file, drop it in assets/fonts/,
+   uncomment this, and set FONTS.display = "'Invite Display', ..." in config.js.
+
+@font-face {
+  font-family: 'Invite Display';
+  src: url('../assets/fonts/display.woff2') format('woff2');
+  font-weight: 400 900;
+  font-display: swap;
+}
+*/
+
+:root {
+  --cream: #f3efe6;
+  --ink: #241d18;
+  --marigold: #e9a72c;
+  --chilli: #b8362c;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #141210;
+  font-family: 'Baloo 2', 'Trebuchet MS', system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+/* The canvas lives off-screen while it is only a texture source. */
+#stage {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+}
+
+/* Preview mode (?preview=1) shows the same canvas full-bleed, no camera. */
+body.preview { background: var(--cream); }
+
+body.preview #stage {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+/* AR.js injects the video + canvas; keep them behind the overlay. */
+#ar-root { position: fixed; inset: 0; }
+.a-enter-vr, .a-enter-ar, .a-orientation-modal { display: none !important; }
+
+#overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: end center;
+  padding: 0 20px calc(28px + env(safe-area-inset-bottom));
+  pointer-events: none;
+  z-index: 10;
+}
+
+#overlay > div {
+  pointer-events: auto;
+  max-width: 22rem;
+  text-align: center;
+  color: var(--cream);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, .55);
+}
+
+#loader {
+  place-self: center;
+  color: var(--ink);
+}
+
+body:not(.preview) #loader { color: var(--cream); }
+
+#loader p { margin: 14px 0 0; font-size: 1rem; letter-spacing: .01em; }
+
+.spinner {
+  width: 34px;
+  height: 34px;
+  margin: 0 auto;
+  border: 3px solid rgba(233, 167, 44, .28);
+  border-top-color: var(--marigold);
+  border-radius: 50%;
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.hint-title {
+  margin: 0 0 6px;
+  font-size: 1.18rem;
+  font-weight: 800;
+}
+
+.hint-sub {
+  margin: 0;
+  font-size: .92rem;
+  font-weight: 600;
+  opacity: .85;
+  line-height: 1.45;
+}
+
+#hint { animation: float-up 420ms ease-out both; }
+
+@keyframes float-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+#preview-btn {
+  margin-top: 14px;
+  padding: 11px 20px;
+  font: inherit;
+  font-weight: 800;
+  color: #2a211a;
+  background: var(--marigold);
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+}
+
+#preview-btn:active { transform: translateY(1px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2.4s; }
+  #hint { animation: none; }
+}
