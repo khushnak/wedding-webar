@@ -19,7 +19,20 @@
 
   const el = id => document.getElementById(id);
   const canvas = el('stage');
-  const stage = new E.Stage(canvas, C);
+
+  /* ?preview=1 keeps the original single composite canvas — one stage that
+     paints everything, exactly as before. In AR the film is split across one
+     canvas per diorama panel (CONFIG.LAYERS): the whole scene file runs once
+     per panel, each onto its own canvas and 2D context, and each pass paints
+     only the artwork that belongs to that panel. Running the scene per panel
+     rather than routing individual draws is what keeps the camera pans,
+     save/restore nesting and world-space tiling working untouched.
+     The visible #stage canvas doubles as the characters panel. */
+  const LAYER_ORDER = (C.LAYERS && C.LAYERS.order) || ['characters'];
+  const STAGES = PREVIEW
+    ? [new E.Stage(canvas, C)]
+    : LAYER_ORDER.map(name => new E.Stage(
+        name === 'characters' ? canvas : document.createElement('canvas'), C, name));
 
   const TOTAL = SCENES.reduce((a, s) => a + s.dur, 0);
   const RUN = ONLY ? (SCENES.find(s => s.id === ONLY) || {}).dur || TOTAL : TOTAL;
@@ -44,7 +57,7 @@
         if (!im.width) console.warn('[invite] missing asset:', C.ASSETS[k]);
         map[k] = im;
       });
-      stage.setImages(map);
+      STAGES.forEach(st => st.setImages(map));
     });
   }
 
@@ -88,29 +101,32 @@
       if (this.lastDraw >= 0 && since >= 0 && since < minStep) return false;
       this.lastDraw = this.time;
 
-      stage.begin();
-      let t = Math.min(this.time, RUN);
+      const t = Math.min(this.time, RUN);
 
-      if (ONLY) {
-        const s = SCENES.find(x => x.id === ONLY);
-        if (s) s.draw(stage, Math.min(t, s.dur));
-      } else {
-        let acc = 0;
-        for (const s of SCENES) {
-          if (t < acc + s.dur || s === SCENES[SCENES.length - 1]) {
-            s.draw(stage, Math.min(t - acc, s.dur));
-            if (DEBUG) hud(s.id, t - acc, t);
-            break;
+      /* One pass per diorama panel (just one in preview). */
+      for (const st of STAGES) {
+        st.begin();
+        if (ONLY) {
+          const s = SCENES.find(x => x.id === ONLY);
+          if (s) s.draw(st, Math.min(t, s.dur));
+        } else {
+          let acc = 0;
+          for (const s of SCENES) {
+            if (t < acc + s.dur || s === SCENES[SCENES.length - 1]) {
+              s.draw(st, Math.min(t - acc, s.dur));
+              if (DEBUG && st.on('characters')) hud(st, s.id, t - acc, t);
+              break;
+            }
+            acc += s.dur;
           }
-          acc += s.dur;
         }
       }
       return true;
     },
   };
 
-  function hud(id, local, total) {
-    const c = stage.ctx;
+  function hud(st, id, local, total) {
+    const c = st.ctx;
     c.save();
     c.globalAlpha = .85;
     c.fillStyle = '#241d18';
@@ -182,42 +198,93 @@
       </a-scene>`;
 
     const marker = el('marker');
+    /* AR.js's own frame-by-frame detection can miss a frame from motion
+       blur or a brief partial occlusion during normal handheld movement,
+       firing a markerLost immediately followed by markerFound. Without
+       this grace window every such blip paused (and visibly dipped) the
+       animation, which read as "restarting" on the smallest phone
+       movement. Debouncing the pause absorbs short blips; a real loss
+       (card moved away, out of frame) still pauses/resets as before. */
+    const LOST_GRACE_MS = 300;
+    let lostTimer = null;
     marker.addEventListener('markerFound', () => {
+      clearTimeout(lostTimer);
+      lostTimer = null;
       el('hint').hidden = true;
       if (!director.playing) director.reset();
       director.play();
     });
-    marker.addEventListener('markerLost', () => director.pause());
+    marker.addEventListener('markerLost', () => {
+      clearTimeout(lostTimer);
+      lostTimer = setTimeout(() => director.pause(), LOST_GRACE_MS);
+    });
   }
 
   function registerComponent() {
     AFRAME.registerComponent('story-plane', {
       init() {
         const m = C.MARKER;
-        const tex = new THREE.CanvasTexture(canvas);
-        tex.minFilter = THREE.LinearFilter;
-        tex.magFilter = THREE.LinearFilter;
-        tex.generateMipmaps = false;
-        this.tex = tex;
-
         const h = m.scale;
         const w = h * (C.STAGE.w / C.STAGE.h);
-        const mesh = new THREE.Mesh(
-          new THREE.PlaneGeometry(w, h),
-          new THREE.MeshBasicMaterial({
-            map: tex,
-            transparent: true,
-            alphaTest: 0.01,
-            depthWrite: false,
-            side: THREE.DoubleSide,
-            toneMapped: false,
-          })
-        );
-        /* Upright, standing on the card and facing the reader. */
-        mesh.position.set(0, h * 0.52 + m.height * 0.12, 0);
-        this.baseY = mesh.position.y;
-        this.mesh = mesh;
-        this.el.setObject3D('mesh', mesh);
+        const tilt = -(m.tiltDeg || 0) * Math.PI / 180;
+        const depth = (C.LAYERS && C.LAYERS.depth) || {};
+        /* Standing on the card, leaning back toward a viewer above it.
+           AR.js post-multiplies the marker pose by makeRotationX(+PI/2)
+           (threex-armarkercontrols), which maps a-marker local +Y onto
+           the card's surface normal: +Y is straight up out of the flat
+           card, X and Z lie in the card's plane, and +Z points at the
+           reader's side of the printed marker.
+
+           PlaneGeometry spans local X (width) and Y (height) with its
+           face normal on +Z, so with rotation at the identity a panel
+           stands at a true 90 deg to the card — but its face aims
+           horizontally, across the card, which is why it only reads
+           square-on with the phone down at card level. Leaning it back
+           about X by MARKER.tiltDeg lifts that normal to point tiltDeg
+           above the card, so it reads from a phone held above instead.
+
+           One group carries the whole diorama, so the rise animation
+           below moves and scales every panel together and none of them
+           can drift out of their depth spacing. Because the group itself
+           is unrotated, each panel's own position.z runs along the card's
+           +Z — the panels are parallel leaning sheets standing at
+           different distances along the print, like a pop-up card, and
+           that spacing is what produces the parallax as the phone moves. */
+        const group = new THREE.Group();
+        /* Bottom edge of the leaning panels rests just above the card, so
+           the scene grows out of the print instead of hovering over it.
+           A tilted panel of height h only spans h*cos(tilt) vertically, and
+           the group's zoom stretches that, so both are folded in here to
+           keep the bottom edge planted whatever dioramaScale is set to.
+           The clearance itself stays unscaled — it is an absolute gap. */
+        this.zoom = m.dioramaScale || 1;
+        group.position.set(0, this.zoom * (h / 2) * Math.cos(tilt) + m.height * 0.05, 0);
+        this.baseY = group.position.y;
+        this.group = group;
+        this.el.setObject3D('mesh', group);
+
+        this.panels = STAGES.map((st, i) => {
+          const tex = new THREE.CanvasTexture(st.cv);
+          tex.minFilter = THREE.LinearFilter;
+          tex.magFilter = THREE.LinearFilter;
+          tex.generateMipmaps = false;
+          const mesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(w, h),
+            new THREE.MeshBasicMaterial({
+              map: tex,
+              transparent: true,
+              alphaTest: 0.01,
+              depthWrite: false,
+              side: THREE.DoubleSide,
+              toneMapped: false,
+            })
+          );
+          mesh.rotation.x = tilt;                     // all panels stay parallel
+          mesh.position.z = depth[st.layer] || 0;     // back (-) to front (+)
+          mesh.renderOrder = i;                       // painted back panel first
+          group.add(mesh);
+          return { mesh, tex, stage: st, wasDirty: true };
+        });
 
         this.rise = 0;
         this.last = performance.now();
@@ -232,9 +299,12 @@
         const target = director.playing ? 1 : 0;
         this.rise += (target - this.rise) * Math.min(1, dt * (target ? 4.5 : 9));
         const r = E.ease.back(E.clamp(this.rise));
-        this.mesh.scale.setScalar(0.25 + 0.75 * E.clamp(this.rise * 1.2));
-        this.mesh.position.y = this.baseY * (0.15 + 0.85 * r);
-        this.mesh.material.opacity = E.clamp(this.rise * 1.6);
+        /* the whole diorama rises and grows as one, depth spacing intact —
+           the rise curve is unchanged, just multiplied by the overall zoom */
+        this.group.scale.setScalar(this.zoom * (0.25 + 0.75 * E.clamp(this.rise * 1.2)));
+        this.group.position.y = this.baseY * (0.15 + 0.85 * r);
+        const op = E.clamp(this.rise * 1.6);
+        for (const p of this.panels) p.mesh.material.opacity = op;
 
         if (!director.playing) {
           director.lostFor += dt;
@@ -242,7 +312,16 @@
           return;
         }
         director.advance(dt);
-        if (director.draw()) this.tex.needsUpdate = true;
+        /* Only re-upload panels that actually painted this frame — an empty
+           midground costs nothing in scenes that have none. The wasDirty
+           term pushes one final upload after a panel empties, so a cleared
+           canvas replaces its last contents instead of freezing on screen. */
+        if (director.draw()) {
+          for (const p of this.panels) {
+            if (p.stage.dirty || p.wasDirty) p.tex.needsUpdate = true;
+            p.wasDirty = p.stage.dirty;
+          }
+        }
       },
     });
   }
@@ -268,20 +347,36 @@
 
     if (PREVIEW) return startPreview('requested');
 
-    /* Ask for the camera up front so we can give a real message if it fails,
-       instead of AR.js silently showing a black screen. */
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-      });
-      s.getTracks().forEach(t => t.stop());
-    } catch (err) {
-      return showError(
-        location.protocol === 'https:' || location.hostname === 'localhost'
-          ? 'Camera permission was declined. Reload and allow access to use the card.'
-          : 'Open this page over https:// (or localhost) — browsers only give camera access on secure pages.'
-      );
+    // AR.js opens the webcam itself and already asks for the rear camera:
+    // its own constraints are hard-coded to
+    //   {audio: false, video: {facingMode: "environment", width/height ideal}}
+    // so nothing here needs to select the camera. The video element it
+    // creates also already carries autoplay/muted/playsinline, which is
+    // what mobile browsers require to start a stream without a tap.
+
+    // getUserMedia is only exposed in a secure context (https://, or
+    // localhost). On a plain http:// LAN address on a phone it is simply
+    // missing, and AR.js would fail deep inside its own init with nothing
+    // shown on screen — surface that now instead of hanging forever.
+    if (!window.isSecureContext) {
+      return showError('Open this page over https:// (or localhost) to use the camera.');
     }
+
+    // AR.js requests the webcam itself once the <a-scene> below is built,
+    // and reports the outcome via these window events. Hook them up so a
+    // denied/unavailable camera shows the error screen, and so the loader
+    // stays up (never a bare black screen) until the feed is truly live,
+    // instead of unhiding it right after the scene markup is injected.
+    let cameraReady = false;
+    window.addEventListener('camera-error', (e) => {
+      console.error('[invite] camera-error', e.detail || e);
+      showError('Camera access was blocked. Allow camera permission and reload.');
+    });
+    window.addEventListener('camera-init', () => {
+      cameraReady = true;
+      el('loader').hidden = true;
+      el('hint').hidden = false;
+    });
 
     const scripts = [
       'https://aframe.io/releases/1.4.2/aframe.min.js',
@@ -300,8 +395,18 @@
 
     registerComponent();
     buildScene();
-    el('loader').hidden = true;
-    el('hint').hidden = false;
+
+    // Safety net only: the 'camera-init' listener above is what normally
+    // hides the loader, the moment the webcam feed is actually live. If a
+    // future/older AR.js build ever fails to fire that event, fall back
+    // to unhiding here so the UI can't get stuck on the spinner forever.
+    setTimeout(() => {
+      if (!cameraReady && el('error').hidden) {
+        console.warn('[invite] camera-init never fired; showing UI anyway');
+        el('loader').hidden = true;
+        el('hint').hidden = false;
+      }
+    }, 8000);
   }
 
   boot();

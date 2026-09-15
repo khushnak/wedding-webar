@@ -102,6 +102,41 @@ const CONFIG = {
     choppy: 14,      // animatic "step" rate for character motion (0 = smooth)
   },
 
+  /* --------------------------------------------------------------- depth */
+  /* The film is painted onto four separate panels standing on the card, so
+     it reads as a paper diorama instead of one flat screen. Each panel gets
+     its own canvas, its own texture and its own plane; they all lean back by
+     MARKER.tiltDeg and all stand on the card, but sit at different distances
+     along it — which is what produces the parallax when the phone moves.
+
+     `keys` says which artwork lands on which panel. Anything NOT listed here
+     (characters, props, icons, typography, effects) is painted on the
+     'characters' panel, so new artwork needs no entry unless it is scenery.
+
+     `depth` is how far each panel sits along the card, in card widths:
+     negative is further back, positive is nearer the viewer, and the
+     characters panel is the 0 reference so the existing composition stays
+     exactly where it is today. The printed Hiro marker is 1 unit, so at an
+     80mm card these span roughly 6mm in front to 44mm behind. Widen them for
+     a stronger pop, narrow them if the panels start to look detached.
+
+     ?preview=1 ignores all of this and draws the whole film onto one canvas,
+     exactly as before. */
+  LAYERS: {
+    order: ['background', 'midground', 'characters', 'foreground'],
+    keys: {
+      background: ['gardenBg', 'collegeBg', 'airportBg', 'riverBg', 'louvreBg', 'eiffelBg'],
+      midground: ['gardenMid', 'collegeMid', 'airportMid'],
+      foreground: ['gardenFg', 'collegeFg', 'airportFg', 'riverFg', 'louvreFg', 'eiffelFg', 'roadFg'],
+    },
+    depth: {
+      background: -0.55,
+      midground: -0.30,
+      characters: 0,
+      foreground: 0.22,
+    },
+  },
+
   /* --------------------------------------------------------------- fonts */
   /* When the handwriting/display font arrives, change these two strings. */
   FONTS: {
@@ -272,11 +307,30 @@ const CONFIG = {
        your invitation card at https://ar-js-org.github.io/AR.js/three.js/examples/marker-training/examples/generator.html */
     type: 'hiro',                        // 'hiro' | 'pattern'
     patternUrl: 'assets/marker/invite.patt',
-    /* How far above the card the film floats, and how big it is, in card
-       widths. The plane's aspect ratio always matches STAGE.w/STAGE.h
-       (main.js computes it from that), so it's landscape now. */
+    /* How far the film's bottom edge sits above the card surface, and how
+       tall the standing plane is, in card widths. The plane's aspect ratio
+       always matches STAGE.w/STAGE.h (main.js computes it from that), so
+       it's landscape now. It stands upright, perpendicular to the card
+       (see story-plane in main.js), not floating flat above it. */
     height: 1.45,
     scale: 2.5,
+    /* Lean-back of the standing film, in degrees from vertical, hinged on
+       the card's own left-right axis. The plane's face normal ends up this
+       far above the card, so it is roughly the phone elevation the film
+       reads best at. 0 keeps the film at a literal 90 deg to the card, but
+       then it is only square-on from card level, with the phone looking
+       along the card rather than down at it. 35 covers a phone held 40-80
+       deg above the card; raise toward 45 to favour steeper, more overhead
+       viewing, lower it toward 0 to favour a flatter, eye-level look. */
+    tiltDeg: 35,
+    /* Overall size of the whole diorama on screen. This is a uniform scale
+       on the group that carries every panel, so panel size AND the depth
+       spacing in LAYERS.depth grow together — the composition is identical,
+       just bigger, and the parallax keeps its proportions. Prefer this over
+       raising `scale` above, which would enlarge the panels while leaving
+       the depths where they are and flatten the diorama out. The rise
+       animation multiplies into this, so its timing is unaffected. */
+    dioramaScale: 1.8,
     smoothing: { count: 5, tolerance: 0.02, threshold: 5 },
   },
 };

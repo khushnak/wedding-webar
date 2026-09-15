@@ -67,10 +67,31 @@ const E = (() => {
     Math.sin((t * speed + phase) * Math.PI * 2) * amp;
 
   /* --------------------------------------------------------------- stage */
+  /* key -> panel name, built once per config (see CONFIG.LAYERS). */
+  function layerMap(cfg) {
+    if (cfg._layerMap) return cfg._layerMap;
+    const m = {};
+    const keys = (cfg.LAYERS && cfg.LAYERS.keys) || {};
+    for (const name of Object.keys(keys)) {
+      for (const k of keys[name]) m[k] = name;
+    }
+    return (cfg._layerMap = m);
+  }
+
   class Stage {
-    constructor(canvas, cfg) {
+    /* `layer` names which diorama panel this instance paints. null means a
+       composite stage that paints everything onto one canvas, which is what
+       ?preview=1 uses and what this class did before layering existed. The
+       whole scene file is run once per panel; each pass owns its own canvas
+       and context, so camera translates, save/restore and world-space
+       tiling all behave exactly as they always have — the pass simply skips
+       the artwork that belongs to a different panel. */
+    constructor(canvas, cfg, layer = null) {
       this.cv = canvas;
       this.cfg = cfg;
+      this.layer = layer;
+      this.map = layerMap(cfg);
+      this.dirty = false;
       this.W = cfg.STAGE.logicalW;
       this.H = cfg.STAGE.logicalH;
       this.C = cfg.PALETTE;
@@ -81,10 +102,19 @@ const E = (() => {
       this.images = {};
     }
 
+    /* Which panel a piece of artwork stands on. */
+    layerOf(key) { return this.map[key] || 'characters'; }
+    /* True when this pass paints `name`'s content. scenes.js calls this to
+       gate the few places it draws straight to the 2D context. */
+    on(name) { return this.layer === null || this.layer === name; }
+    /* True when this pass paints this artwork. */
+    wants(key) { return this.on(this.layerOf(key)); }
+
     setImages(map) { this.images = map; }
     img(key) { return this.images[key]; }
 
     begin() {
+      this.dirty = false;
       const c = this.ctx;
       c.setTransform(1, 0, 0, 1, 0, 0);
       c.clearRect(0, 0, this.cv.width, this.cv.height);
@@ -105,8 +135,10 @@ const E = (() => {
     /* o: x, y, h | w, anchor ('bottom'|'center'|'top'), rot (deg), alpha,
           flip, scale, shadow (0..1 = ground shadow width factor)           */
     sprite(key, o = {}) {
+      if (!this.wants(key)) return;
       const im = this.img(key);
       if (!im || !im.width) return;
+      this.dirty = true;
       const c = this.ctx;
       const ratio = im.width / im.height;
       let h = o.h, w = o.w;
@@ -141,8 +173,10 @@ const E = (() => {
 
     /* Draw part of a sprite sheet cell: src rect given as 0..1 fractions. */
     spriteCrop(key, sx, sy, sw, sh, o = {}) {
+      if (!this.wants(key)) return;
       const im = this.img(key);
       if (!im || !im.width) return;
+      this.dirty = true;
       const c = this.ctx;
       const SX = sx * im.width, SY = sy * im.height;
       const SW = sw * im.width, SH = sh * im.height;
@@ -192,10 +226,17 @@ const E = (() => {
       c.lineWidth = out;
       c.fillStyle = o.color || this.C.ink;
 
+      /* Typography stands with the characters, but the measurement below
+         still has to run on every panel: scenes lay other things out from
+         the width this returns. */
+      const paint = this.on('characters');
+      if (paint) this.dirty = true;
       for (let i = 0; i < chars.length; i++) {
         const cx = x + widths[i] / 2;
-        if (out > 0) c.strokeText(chars[i], cx, 0);
-        c.fillText(chars[i], cx, 0);
+        if (paint) {
+          if (out > 0) c.strokeText(chars[i], cx, 0);
+          c.fillText(chars[i], cx, 0);
+        }
         x += widths[i] + ls;
       }
       c.restore();
@@ -214,6 +255,8 @@ const E = (() => {
 
     /* ------------------------------------------------------------ shapes */
     badge(x, y, r, o = {}) {
+      if (!this.on('characters')) return;
+      this.dirty = true;
       const c = this.ctx;
       c.save();
       c.globalAlpha = o.alpha == null ? 1 : clamp(o.alpha);
@@ -229,8 +272,10 @@ const E = (() => {
 
     /* An interest icon sitting inside its circle. */
     iconBadge(key, x, y, r, o = {}) {
+      if (!this.on('characters')) return;
       const s = o.scale == null ? 1 : o.scale;
       if (s <= 0) return;
+      this.dirty = true;
       const c = this.ctx;
       c.save();
       c.translate(x, y);
@@ -250,6 +295,8 @@ const E = (() => {
     }
 
     heart(x, y, s, o = {}) {
+      if (!this.on('characters')) return;
+      this.dirty = true;
       const c = this.ctx;
       c.save();
       c.globalAlpha = o.alpha == null ? 1 : clamp(o.alpha);
@@ -272,6 +319,8 @@ const E = (() => {
     }
 
     star(x, y, s, o = {}) {
+      if (!this.on('characters')) return;
+      this.dirty = true;
       const c = this.ctx;
       c.save();
       c.globalAlpha = o.alpha == null ? 1 : clamp(o.alpha);
@@ -291,6 +340,8 @@ const E = (() => {
 
     /* Comic impact shape. */
     burst(x, y, r, o = {}) {
+      if (!this.on('characters')) return;
+      this.dirty = true;
       const c = this.ctx;
       const n = o.points || 14;
       c.save();
@@ -317,6 +368,8 @@ const E = (() => {
 
     /* Radiating ink strokes: surprise, impact, excitement. */
     rays(x, y, o = {}) {
+      if (!this.on('characters')) return;
+      this.dirty = true;
       const c = this.ctx;
       const n = o.count || 8;
       c.save();
@@ -341,6 +394,8 @@ const E = (() => {
     /* Soft ground so characters do not float in space. Deliberately a
        gradient, not a hard shape - in AR it has to melt into the camera feed. */
     ground(y, o = {}) {
+      if (!this.on('characters')) return;
+      this.dirty = true;
       const c = this.ctx;
       const w = o.w || 560, h = o.h || 120, cy = y + (o.dip || 40);
       c.save();
@@ -359,6 +414,8 @@ const E = (() => {
     }
 
     shadow(x, y, w, alpha = 1) {
+      if (!this.on('characters')) return;
+      this.dirty = true;
       const c = this.ctx;
       c.save();
       c.globalAlpha = clamp(alpha) * .55;
@@ -386,21 +443,26 @@ const E = (() => {
       const end = clamp(prog);
       const start = clamp(o.from || 0);
       if (end <= start) return this.quad(p0, cp, p1, end);
-      c.save();
-      c.globalAlpha = o.alpha == null ? 1 : clamp(o.alpha);
-      c.strokeStyle = o.color || this.C.chilli;
-      c.lineWidth = o.lw || 7;
-      c.setLineDash(o.dash || [22, 18]);
-      c.lineDashOffset = o.offset || 0;
-      c.beginPath();
-      for (let i = 0; i <= n; i++) {
-        const t = start + (end - start) * (i / n);
-        const pt = this.quad(p0, cp, p1, t);
-        i ? c.lineTo(pt.x, pt.y) : c.moveTo(pt.x, pt.y);
+      /* The dashes ride with the characters, but every panel still needs
+         the head point returned below — scenes sit the aeroplane on it. */
+      if (this.on('characters')) {
+        this.dirty = true;
+        c.save();
+        c.globalAlpha = o.alpha == null ? 1 : clamp(o.alpha);
+        c.strokeStyle = o.color || this.C.chilli;
+        c.lineWidth = o.lw || 7;
+        c.setLineDash(o.dash || [22, 18]);
+        c.lineDashOffset = o.offset || 0;
+        c.beginPath();
+        for (let i = 0; i <= n; i++) {
+          const t = start + (end - start) * (i / n);
+          const pt = this.quad(p0, cp, p1, t);
+          i ? c.lineTo(pt.x, pt.y) : c.moveTo(pt.x, pt.y);
+        }
+        c.stroke();
+        c.setLineDash([]);
+        c.restore();
       }
-      c.stroke();
-      c.setLineDash([]);
-      c.restore();
       const head = this.quad(p0, cp, p1, end);
       const prev = this.quad(p0, cp, p1, Math.max(start, end - .02));
       head.angle = Math.atan2(head.y - prev.y, head.x - prev.x) * 180 / Math.PI;
@@ -408,6 +470,8 @@ const E = (() => {
     }
 
     polyline(pts, o = {}) {
+      if (!this.on('characters')) return;
+      this.dirty = true;
       const c = this.ctx;
       c.save();
       c.globalAlpha = o.alpha == null ? 1 : clamp(o.alpha);
@@ -421,10 +485,13 @@ const E = (() => {
       c.restore();
     }
 
-    /* Full-view cover used by the BAM / heart / sparkle transitions. */
+    /* Full-view cover used by the BAM / heart / sparkle transitions.
+       Deliberately NOT gated to one panel: a wipe has to hide the whole
+       diorama, so every panel paints it. */
     cover(color, alpha) {
       const c = this.ctx;
       if (alpha <= 0) return;
+      this.dirty = true;
       c.save();
       c.globalAlpha = clamp(alpha);
       c.fillStyle = color;

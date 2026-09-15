@@ -303,6 +303,7 @@ const SCENES = (() => {
      copies whenever they line up correctly (the normal case) — but
      guarantees the camera can never expose bare/transparent canvas. */
   function gardenSafetyFill(g) {
+    if (!g.on('background')) return;   // sky belongs on the back panel only
     g.ctx.save();
     g.ctx.fillStyle = P.sky;
     g.ctx.fillRect(-C.STAGE.logicalW, 0, GARDEN_COPIES * GARDEN_STRIDE + 3 * C.STAGE.logicalW, C.STAGE.logicalH);
@@ -332,19 +333,21 @@ const SCENES = (() => {
 
   function collegeBG(g, t, rise = 1, alpha = 1) {
     if (alpha <= 0) return;
-    // two soft clouds, drifting
-    g.ctx.save();
-    g.ctx.globalAlpha = alpha * .85;
-    g.ctx.fillStyle = '#ffffff';
-    [[230, 330, 78], [760, 260, 62], [620, 400, 44]].forEach((c, i) => {
-      const dx = ((t * (6 + i * 3)) % 260) - 60;
-      g.ctx.beginPath();
-      g.ctx.ellipse(c[0] + dx, c[1], c[2] * 1.7, c[2], 0, 0, 6.2832);
-      g.ctx.ellipse(c[0] + dx - c[2], c[1] + c[2] * .3, c[2] * .9, c[2] * .68, 0, 0, 6.2832);
-      g.ctx.ellipse(c[0] + dx + c[2] * 1.1, c[1] + c[2] * .25, c[2] * .8, c[2] * .6, 0, 0, 6.2832);
-      g.ctx.fill();
-    });
-    g.ctx.restore();
+    // two soft clouds, drifting — sky dressing, so the back panel
+    if (g.on('background')) {
+      g.ctx.save();
+      g.ctx.globalAlpha = alpha * .85;
+      g.ctx.fillStyle = '#ffffff';
+      [[230, 330, 78], [760, 260, 62], [620, 400, 44]].forEach((c, i) => {
+        const dx = ((t * (6 + i * 3)) % 260) - 60;
+        g.ctx.beginPath();
+        g.ctx.ellipse(c[0] + dx, c[1], c[2] * 1.7, c[2], 0, 0, 6.2832);
+        g.ctx.ellipse(c[0] + dx - c[2], c[1] + c[2] * .3, c[2] * .9, c[2] * .68, 0, 0, 6.2832);
+        g.ctx.ellipse(c[0] + dx + c[2] * 1.1, c[1] + c[2] * .25, c[2] * .8, c[2] * .6, 0, 0, 6.2832);
+        g.ctx.fill();
+      });
+      g.ctx.restore();
+    }
 
     g.ground(GY, { alpha: alpha * .9, w: 640, h: 150, fill: 'rgba(47,90,67,0.13)' });
     g.sprite('college', {
@@ -701,10 +704,12 @@ const SCENES = (() => {
     /* Sky backstop, same as Scene 1: while Layer 1 is still rising it has
        not reached the top of the frame yet, and without this the gap
        above it would be bare canvas. */
-    g.ctx.save();
-    g.ctx.fillStyle = P.sky;
-    g.ctx.fillRect(0, 0, C.STAGE.logicalW, C.STAGE.logicalH);
-    g.ctx.restore();
+    if (g.on('background')) {
+      g.ctx.save();
+      g.ctx.fillStyle = P.sky;
+      g.ctx.fillRect(0, 0, C.STAGE.logicalW, C.STAGE.logicalH);
+      g.ctx.restore();
+    }
 
     /* Layer 1 — the campus itself, opaque, edge to edge. Gentle rise,
        then completely static. */
@@ -961,10 +966,12 @@ const SCENES = (() => {
 
     /* Flat backdrop, painted full-frame and NOT slid, so the exit below can
        never expose a bare edge. */
-    g.ctx.save();
-    g.ctx.fillStyle = LF_BACKDROP;
-    g.ctx.fillRect(0, 0, bgW, bgH);
-    g.ctx.restore();
+    if (g.on('background')) {
+      g.ctx.save();
+      g.ctx.fillStyle = LF_BACKDROP;
+      g.ctx.fillRect(0, 0, bgW, bgH);
+      g.ctx.restore();
+    }
 
     /* Everything else rides one transform, so the exit is a single physical
        slide of the whole illustrated composition to the left. */
@@ -1076,10 +1083,12 @@ const SCENES = (() => {
   function oneDay(g, t) {
     const bgW = C.STAGE.logicalW, bgH = C.STAGE.logicalH;
 
-    g.ctx.save();
-    g.ctx.fillStyle = OD_BACKDROP;
-    g.ctx.fillRect(0, 0, bgW, bgH);
-    g.ctx.restore();
+    if (g.on('background')) {
+      g.ctx.save();
+      g.ctx.fillStyle = OD_BACKDROP;
+      g.ctx.fillRect(0, 0, bgW, bgH);
+      g.ctx.restore();
+    }
 
     /* Title card: both lines Modak, stamped on with the same discrete punch
        as Scene 4 — no life() fade envelope — then cut away before the
@@ -1275,10 +1284,12 @@ const SCENES = (() => {
     const drawStopFg = (s, prog) =>
       layer(s.fg, prog, 500 * SY, s.full ? 'full' : 'fg');
 
-    g.ctx.save();
-    g.ctx.fillStyle = PA_SKY;
-    g.ctx.fillRect(0, 0, bgW, bgH);
-    g.ctx.restore();
+    if (g.on('background')) {
+      g.ctx.save();
+      g.ctx.fillStyle = PA_SKY;
+      g.ctx.fillRect(0, 0, bgW, bgH);
+      g.ctx.restore();
+    }
 
     /* the journey in from Scene 5 */
     const line = pl(q(t, C.STAGE.choppy), PA_LINE_T0, PA_LINE_DUR);
@@ -1401,7 +1412,7 @@ const SCENES = (() => {
     });
 
     const orn = life(tb, .5, outAt - .25, .3, .4);
-    if (orn > 0) {
+    if (orn > 0 && g.on('characters')) {
       g.ctx.save();
       g.ctx.globalAlpha = orn;
       g.ctx.strokeStyle = P.marigold;
@@ -1457,7 +1468,7 @@ const SCENES = (() => {
     }
 
     /* sangeet: two glasses, one clink */
-    if (cast.glasses) {
+    if (cast.glasses && g.on('characters')) {
       const gl = life(tb, 1.6, outAt - 1.8, .35, .4);
       if (gl > 0) {
         const tilt = bob(wob, .7, 7);
@@ -1488,7 +1499,7 @@ const SCENES = (() => {
     }
 
     /* reception: a little confetti */
-    if (cast.confetti) {
+    if (cast.confetti && g.on('characters')) {
       const cf = life(tb, 1.3, outAt - 1.4, .4, .5);
       const cols = [P.marigold, P.chilli, P.rose, P.leaf];
       for (let n = 0; n < 16; n++) {

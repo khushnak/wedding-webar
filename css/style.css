@@ -26,11 +26,21 @@ html, body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: #141210;
   font-family: 'Baloo 2', 'Trebuchet MS', system-ui, sans-serif;
   -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
 }
+
+/* Only the root element carries a background colour, and this matters.
+   AR.js injects the live camera as <video id="arjs-video"> into <body>
+   with an inline z-index:-2. A negative z-index paints above the root's
+   background but BELOW body's own background box, so any opaque
+   background on <body> covers the camera feed completely — the camera
+   runs and permission is granted, yet the screen stays solid black.
+   Preview mode sets its own body background below (higher specificity)
+   and never creates a video, so it is unaffected. */
+html { background: #141210; }
+body { background: transparent; }
 
 /* The canvas lives off-screen while it is only a texture source. */
 #stage {
