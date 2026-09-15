@@ -24,6 +24,30 @@
   const TOTAL = SCENES.reduce((a, s) => a + s.dur, 0);
   const RUN = ONLY ? (SCENES.find(s => s.id === ONLY) || {}).dur || TOTAL : TOTAL;
 
+  /* ----------------------------------------------------------- the gates */
+  /* A scene may declare `gates`: local times at which the film waits for the
+     viewer to pull the journey forward. The clock stops dead on the gate
+     frame, so every scene stays exactly the pure draw(stage, t) function it
+     was — the gate changes when t advances, never what t means. */
+  function buildGates() {
+    const out = [];
+    if (ONLY) {
+      const s = SCENES.find(x => x.id === ONLY);
+      if (s && s.gates) s.gates.forEach(lt => out.push({ at: lt, done: false }));
+      return out;
+    }
+    let acc = 0;
+    for (const s of SCENES) {
+      if (s.gates) s.gates.forEach(lt => out.push({ at: acc + lt, done: false }));
+      acc += s.dur;
+    }
+    return out;
+  }
+  const GATES = buildGates();
+  const dragThreshold = () =>
+    Math.max(C.DRAG.thresholdMin,
+      Math.min(C.DRAG.thresholdMax, innerWidth * C.DRAG.thresholdFrac));
+
   /* ------------------------------------------------------------- loading */
 
   function loadImages() {
@@ -65,8 +89,22 @@
     playing: PREVIEW,      // preview starts immediately; AR waits for the card
     lostFor: 0,
     lastDraw: -1,
+    drag: 0,               // 0..1 while a gate is open, for the scene to read
+    held: false,           // is the clock currently waiting on a gesture?
+    waited: 0,
 
-    reset() { this.time = START_AT; this.lastDraw = -1; },
+    reset() {
+      this.time = START_AT;
+      this.lastDraw = -1;
+      this.clearGates();
+    },
+
+    clearGates() {
+      GATES.forEach(x => { x.done = false; });
+      this.held = false; this.waited = 0; this.drag = 0;
+    },
+
+    openGate() { return GATES.find(x => !x.done) || null; },
 
     play() { this.playing = true; this.lostFor = 0; },
 
@@ -75,19 +113,42 @@
     /* dt in seconds */
     advance(dt) {
       if (!this.playing) return;
+
+      const gate = this.openGate();
+      if (gate && this.time + dt >= gate.at) {
+        /* land exactly on the gate frame and hold there */
+        this.time = gate.at;
+        this.held = true;
+        this.waited += dt;
+        /* released by the gesture, or by the fallback so the story never
+           dead-ends for someone who does not find it */
+        if (this.drag >= 1 || this.waited >= C.DRAG.fallback) {
+          gate.done = true;
+          this.held = false;
+          this.waited = 0;
+          this.drag = 0;
+        }
+        return;
+      }
+
+      this.held = false;
       this.time += dt;
       if (this.time > RUN + C.LOOP_GAP) {
         this.time = 0;
         this.lastDraw = -1;      // the frame clock wrapped too
+        this.clearGates();
       }
     },
 
     draw() {
       const minStep = 1 / C.STAGE.fpsCap;
       const since = this.time - this.lastDraw;
-      if (this.lastDraw >= 0 && since >= 0 && since < minStep) return false;
+      /* while a gate holds, `time` stops changing but the drag response must
+         still repaint, so the frame-rate gate is skipped */
+      if (!this.held && this.lastDraw >= 0 && since >= 0 && since < minStep) return false;
       this.lastDraw = this.time;
 
+      stage.drag = this.held ? this.drag : 0;
       stage.begin();
       let t = Math.min(this.time, RUN);
 
@@ -108,6 +169,76 @@
       return true;
     },
   };
+
+  /* ------------------------------------------------------ the gesture */
+  /* Pull the journey forward — once, at the airport. The affordance is the
+     plane and its line, so there is no control to hit: while the gate is
+     open the whole frame is the handle, which is the only thing that can
+     work reliably when the picture is a texture on an AR plane rather than
+     a DOM element under the finger.
+
+     Listeners are passive and never call preventDefault, so nothing here
+     touches AR.js's own input or the page's scrolling. */
+  function initDrag() {
+    let startX = 0, startY = 0, active = false, spent = false;
+
+    /* Is this pointer on the affordance? The scene publishes its target as
+       stage.hit in stage coordinates. In preview the canvas is laid out on
+       screen, so the pointer maps onto it exactly and only the plane, its
+       line and the paper patch around them are draggable. Under AR the
+       canvas is parked off-screen (css left:-10000px) and painted onto a
+       THREE plane instead, so no such mapping exists — there the gesture is
+       accepted anywhere, which is the only thing that works reliably and
+       costs nothing, since the gate is open solely while the plane is
+       sitting there waiting. */
+    const onTarget = e => {
+      const hit = stage.hit;
+      if (!hit) return false;
+      const r = canvas.getBoundingClientRect();
+      if (!r.width || !r.height || r.right < 0 || r.left > innerWidth) return true;
+      const sx = (e.clientX - r.left) / r.width * C.STAGE.logicalW;
+      const sy = (e.clientY - r.top) / r.height * C.STAGE.logicalH;
+      return sx >= hit.x0 && sx <= hit.x1 && sy >= hit.y0 && sy <= hit.y1;
+    };
+
+    const down = e => {
+      if (!director.held) return;         // only while the journey is waiting
+      if (!onTarget(e)) return;           // and only on the plane itself
+      active = true;
+      spent = false;
+      startX = e.clientX;
+      startY = e.clientY;
+      director.drag = 0;
+    };
+
+    const move = e => {
+      if (!active || spent) return;
+      /* Forward is RIGHTWARD, matching the way the plane points and the
+         arrow under it. Vertical drift is ignored rather than
+         disqualifying, so a diagonal pull still reads; only a
+         mostly-vertical one fails to accumulate. */
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (dx <= 0) { director.drag = 0; return; }
+      if (Math.abs(dy) > Math.abs(dx) * 2.5) return;
+      director.drag = Math.min(1, dx / dragThreshold());
+      /* Once it releases, this gesture is finished: the finger staying down
+         cannot roll straight on into the next destination. */
+      if (director.drag >= 1) spent = true;
+    };
+
+    const up = () => {
+      active = false;
+      /* a short pull that never reached the threshold simply springs back */
+      if (!spent) director.drag = 0;
+    };
+
+    const opt = { passive: true };
+    addEventListener('pointerdown', down, opt);
+    addEventListener('pointermove', move, opt);
+    addEventListener('pointerup', up, opt);
+    addEventListener('pointercancel', up, opt);
+  }
 
   function hud(id, local, total) {
     const c = stage.ctx;
@@ -139,6 +270,7 @@
     fit();
 
     director.play();
+    initDrag();
     let last = performance.now();
     const loop = now => {
       director.advance(Math.min(.1, (now - last) / 1000));
@@ -300,6 +432,7 @@
 
     registerComponent();
     buildScene();
+    initDrag();
     el('loader').hidden = true;
     el('hint').hidden = false;
   }

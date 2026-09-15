@@ -26,9 +26,9 @@ const CONFIG = {
   EVENTS: [
     {
       name: 'SANGEET',
-      venue: 'The Grand Mirage, Pune',
+      venue: 'DELHI',
       date: '14 February 2027',
-      time: '7:00 pm onwards',
+      time: '7 AM ONWARDS',
     },
     {
       name: 'WEDDING',
@@ -61,18 +61,39 @@ const CONFIG = {
     /* Each of these is its own content length plus a small tail — they
        are trimmed to match, because a scene that keeps running after its
        last beat is what makes an instant cut feel like a slow fade. */
-    meetRahul: 13.15,
+    meetRahul: 12.35,
     meetArya: 6.4,
-    college: 9.25,
+    /* BAM lands at 5.30 and is gone by 5.65; this used to run to 8.60,
+       leaving ~3s of motionless campus after the collision before the cut.
+       Scene 3 opens on the same static campus, so the cut is invisible and
+       the dead time simply goes. */
+    college: 6.2,
     together: 9.2,
-    lifeHappened: 9.3,
-    oneDay: 8,
-    paris: 24.6,
+    lifeHappened: 8.3,
+    /* Ends the instant the travel line clears the frame — the exit is a
+       transition, not a beat, so there is no tail after it. */
+    oneDay: 6.65,
+    paris: 18.7,
     celebrations: 24,
   },
 
   /* Seconds the card can be out of frame before the story resets. */
   RESET_AFTER_LOST: 2.5,
+
+  /* --------------------------------------------------- drag interaction */
+  /* Scene 6 holds the clock three times and lets the viewer pull the travel
+     line forward to move the journey on. These tune that gesture. */
+  DRAG: {
+    /* how far a forward drag must travel to release the gate, as a fraction
+       of the viewport's width, clamped so it is neither a twitch on a large
+       screen nor a marathon on a small one */
+    thresholdFrac: .16,
+    thresholdMin: 56,
+    thresholdMax: 200,
+    /* seconds a gate waits before giving up and continuing on its own, so
+       the story never dead-ends for someone who does not try the gesture */
+    fallback: 6,
+  },
   /* Pause at the end before the film loops. */
   LOOP_GAP: 1.6,
 
@@ -220,6 +241,29 @@ const CONFIG = {
     aryaWedWave: 'characters/arya_wed_wave.png',
     aryaWedBlush: 'characters/arya_wed_blush.png',
     aryaWedPoint: 'characters/arya_wed_point.png',
+
+    /* Scene 7, sangeet — two alternate poses of the couple dancing, plus the
+       two hanging decorations that frame the card. The disco ball's own
+       sparkles are painted into its PNG; the twinkles scenes.js adds are
+       drawn on top with canvas primitives, never by animating the art. */
+    sangeet1: 'characters/sangeet_1.png',
+    sangeet2: 'characters/sangeet_2.png',
+    lights: 'icons/lights.png',
+    discoball: 'icons/discoball.png',
+
+    /* Scene 7, wedding — the varmala, two alternate poses, and the two
+       hanging decorations that frame it left and right. */
+    wedding1: 'characters/wedding_1.png',
+    wedding2: 'characters/wedding_2.png',
+    garlands: 'icons/garlands.png',
+    umbrella: 'icons/umbrella.png',
+
+    /* Scene 7, reception — two alternate poses plus the hanging strings
+       and chandelier that frame them left and right. */
+    reception1: 'characters/reception_1.png',
+    reception2: 'characters/reception_2.png',
+    strings: 'icons/strings.png',
+    chandelier: 'icons/chandeliar.png',
 
     coupleSangeet: 'characters/couple_sangeet.png',
     coupleReception: 'characters/couple_reception.png',

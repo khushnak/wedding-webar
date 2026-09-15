@@ -77,10 +77,19 @@ const SCENES = (() => {
   /* The rises stay gentle and eased — only their durations came down, so
      the environment still unfolds rather than snapping up like the
      characters do. */
-  const GARDEN_L1_T0 = 0, GARDEN_L1_DUR = .75, GARDEN_HOLD = .3;
-  const GARDEN_L2_T0 = GARDEN_L1_T0 + GARDEN_L1_DUR + GARDEN_HOLD, GARDEN_L2_DUR = .6;   // 1.05
-  const GARDEN_L3_T0 = GARDEN_L2_T0 + GARDEN_L2_DUR + GARDEN_HOLD, GARDEN_L3_DUR = .55;  // 1.95
-  const RAHUL_ENTER_T0 = GARDEN_L3_T0 + GARDEN_L3_DUR + GARDEN_HOLD;                     // 2.8
+  /* The three layers OVERLAP rather than queue. Each rise keeps its own
+     unhurried pace — the movement itself is not sped up — but the next
+     layer sets off GARDEN_LAP before the one under it has finished
+     settling, so the whole thing reads as one coordinated upward reveal
+     instead of three animations waiting their turn. That is where the
+     time was going: the old build spent 0.60s of its 2.50s simply holding
+     still between layers. */
+  const GARDEN_L1_T0 = 0, GARDEN_L1_DUR = .75;
+  const GARDEN_LAP = .10;                  // next layer starts this early
+  const GARDEN_SETTLE = .30;               // after the last layer, before anyone enters
+  const GARDEN_L2_T0 = GARDEN_L1_T0 + GARDEN_L1_DUR - GARDEN_LAP, GARDEN_L2_DUR = .6;   // 0.65
+  const GARDEN_L3_T0 = GARDEN_L2_T0 + GARDEN_L2_DUR - GARDEN_LAP, GARDEN_L3_DUR = .55;  // 1.15
+  const RAHUL_ENTER_T0 = GARDEN_L3_T0 + GARDEN_L3_DUR + GARDEN_SETTLE;                  // 2.00
 
   const CUTOUT_HOLD = .6;                                              // per-snap hold, both characters
   const RAHUL_SETTLE_T0 = RAHUL_ENTER_T0 + 2 * CUTOUT_HOLD;            // 4.0
@@ -641,37 +650,49 @@ const SCENES = (() => {
      environment reveal here reads as a slow transition even though the
      scene boundary itself is an instant hard cut. Whole reveal lands in
      2.45s. */
-  const COL_L1_T0 = 0, COL_L1_DUR = .65, COL_HOLD = .25;
-  const COL_L2_T0 = COL_L1_T0 + COL_L1_DUR + COL_HOLD, COL_L2_DUR = .55;   // 0.90
-  const COL_L3_T0 = COL_L2_T0 + COL_L2_DUR + COL_HOLD, COL_L3_DUR = .50;   // 1.70
-  const COL_RAHUL_T0 = COL_L3_T0 + COL_L3_DUR + COL_HOLD;                  // 2.45
+  /* Same overlapping reveal as the garden — see the note there. Two lap
+     values rather than one only because the campus layers are shorter, and
+     a single lap could not land both starts where they belong. */
+  const COL_L1_T0 = 0, COL_L1_DUR = .65;
+  const COL_LAP1 = .05, COL_LAP2 = .10;
+  const COL_SETTLE = .25;
+  const COL_L2_T0 = COL_L1_T0 + COL_L1_DUR - COL_LAP1, COL_L2_DUR = .55;   // 0.60
+  const COL_L3_T0 = COL_L2_T0 + COL_L2_DUR - COL_LAP2, COL_L3_DUR = .50;   // 1.05
+  const COL_RAHUL_T0 = COL_L3_T0 + COL_L3_DUR + COL_SETTLE;                // 1.80
   /* slideIn reaches its final pose after 2 holds — see CUTOUT_POSES. */
   const COL_ARYA_T0 = COL_RAHUL_T0 + 2 * CUTOUT_HOLD + .5;                 // 5.9
   const COL_MEET_T0 = COL_ARYA_T0 + 2 * CUTOUT_HOLD + .6;                  // 7.7
-  /* bam.png is the ONLY impact artwork in the scene — it pops on in
-     discrete steps (same stop-motion language as CUTOUT_POSES: a small
-     frame, an overshoot frame, then a held frame), never a smooth zoom,
-     and nothing else stands in for it at any size. Uniform scale only, so
-     the artwork is never stretched on one axis. */
+  /* bam.png is the ONLY impact artwork in the scene, and it is comic-book
+     PUNCTUATION rather than a transition: three discrete frames — a small
+     slam-in, a big overshoot, a settled hold — and then it is simply gone.
+     It never grows to own the frame. That full-viewport grow is the heart's
+     job at the end of Scene 3, and having both do it made the two moments
+     read as the same device.
+
+        .07  small, hard tilt      235px
+        .07  overshoot the other way   694px
+        .18  settle and HOLD      560px
+             -> gone, college carries on
+
+     Uniform scale only, so the artwork is never stretched on one axis. */
   const COL_BAM_POSES = [
-    { scale: .45, rot: -12, dur: .09 },
-    { scale: 1.18, rot: 3, dur: .10 },
-    { scale: 1.0, rot: -4, dur: .62 },
+    { scale: .42, rot: -14, dur: .07 },
+    { scale: 1.24, rot: 5, dur: .07 },
+    { scale: 1.0, rot: -5, dur: .18 },
   ];
-  const COL_BAM_DUR = COL_BAM_POSES.reduce((a, b) => a + b.dur, 0);        // .81
-  const COL_BAM_H = 330;                   // its size at the collision
-  const COL_BAM_FULL_H = 3400;             // measured full-viewport coverage — see the grow below
+  const COL_BAM_DUR = COL_BAM_POSES.reduce((a, b) => a + b.dur, 0);        // .32
+  const COL_BAM_H = 560;                   // the prominent held size, under CHAR_H 580
+  /* null once the hold is over — that is what makes it snap away rather
+     than linger or fade. */
   const colBamPose = lt => {
+    if (lt < 0) return null;
     let acc = 0;
     for (const b of COL_BAM_POSES) {
       acc += b.dur;
       if (lt < acc) return b;
     }
-    return COL_BAM_POSES[COL_BAM_POSES.length - 1];   // settled, and held from here
+    return null;
   };
-
-  const COL_WIPE_T0 = COL_MEET_T0 + COL_BAM_DUR + 1.09;                    // 9.6
-  const COL_WIPE_DUR = 1.2;                                                // 9.6 -> 10.8 = SCENE_SECONDS.college
 
   /* Same rendered height as Scene 1 (CHAR_H) so both of them read just as
      clearly here — faces, clothing and the pose change all legible at
@@ -758,27 +779,14 @@ const SCENES = (() => {
 
     /* --- the impact graphic, on top of everything --- */
 
-    /* ONE bam.png, drawn by ONE call, alive continuously from the
-       collision to the end of the scene. It stamps on, holds, and then
-       the very same sprite scales up until its artwork owns the frame —
-       it is never removed and re-added, and nothing else is ever drawn
-       in its place. (Having a separate "pop" block and a separate "grow"
-       block left a 1.09s gap where no BAM existed at all, so the grow
-       read as a second graphic arriving.)
-
-       COL_BAM_FULL_H is measured, not derived from the aspect ratio:
-       scaling the PNG until its BOUNDING BOX covers the canvas (h≈1393)
-       still leaves ~719k transparent pixels, because the starburst has
-       transparent corners and gaps between its spikes. 3184px is the
-       smallest height at which nothing shows through from this draw
-       position; 3400 keeps a margin for the -4deg rotation. Only `h` is
-       set, so `w` follows the PNG's own ratio — never stretched. */
-    if (t >= COL_MEET_T0) {
-      const bamPose = colBamPose(t - COL_MEET_T0);
-      const grow = ease.in(pl(t, COL_WIPE_T0, COL_WIPE_DUR));
+    /* ONE bam.png, drawn by ONE call, struck at the collision point and
+       alive for 0.32s only. Only `h` is set, so `w` follows the PNG's own
+       ratio and the artwork is never stretched. */
+    const bamPose = colBamPose(t - COL_MEET_T0);
+    if (bamPose) {
       g.sprite('bam', {
         x: CX, y: GY - COL_CHAR_H * .62, anchor: 'center', rot: bamPose.rot,
-        h: (COL_BAM_H + (COL_BAM_FULL_H - COL_BAM_H) * grow) * bamPose.scale,
+        h: COL_BAM_H * bamPose.scale,
       });
     }
   }
@@ -894,8 +902,12 @@ const SCENES = (() => {
       });
     }
 
-    /* the marigold from the end of Scene 2 clears away */
-    g.cover(P.marigold, 1 - pl(t, 0, .4));
+    /* Scene 2 used to end with bam.png grown to fill the frame — a yellow
+       starburst — and this cleared that wash away. BAM is impact
+       punctuation now and Scene 2 ends on the campus, so there is nothing
+       to clear: the cover was painting marigold over a frame that was
+       already correct. Removed; Scene 2 cuts straight into Scene 3, which
+       opens on the same campus composition anyway. */
   }
 
   /* ---------------------------------------------- 5. then life happened --- */
@@ -905,7 +917,11 @@ const SCENES = (() => {
      punch itself stays fast; the gap between words is what gives each one
      room to land. */
   const LIFE_WORDS = ['THEN', 'LIFE', 'HAPPENED'];
-  const LIFE_WORD_GAP = .85;
+  /* .85 -> .68: the punch itself is untouched (LIFE_PUNCH below), only the
+     wait between stamps. Each word still holds alone for 0.68s before the
+     next lands, which is comfortably readable, and the finished phrase
+     still sits complete for 0.55s before it cuts. */
+  const LIFE_WORD_GAP = .68;
   const LIFE_PUNCH = [
     { scale: 1.34, rot: -2.5, dur: .05 },
     { scale: .93, rot: 1.5, dur: .05 },
@@ -926,17 +942,20 @@ const SCENES = (() => {
      it lets the warm road and the light type carry the frame. */
   const LF_BACKDROP = P.navy;
   const LF_TITLE_T0 = .2;
-  const LF_TITLE_SETTLE = LF_TITLE_T0 + 2 * LIFE_WORD_GAP + .1;    // 2.00
-  const LF_TITLE_END = LF_TITLE_SETTLE + .7;                       // 2.70 — final hold, then it clears
-  const LF_ROAD_T0 = LF_TITLE_END, LF_ROAD_DUR = .6;               // 2.70 -> 3.30
-  const LF_CHARS_T0 = LF_ROAD_T0 + LF_ROAD_DUR + .25;              // 3.55
+  const LF_TITLE_SETTLE = LF_TITLE_T0 + 2 * LIFE_WORD_GAP + .1;    // 1.66
+  const LF_TITLE_END = LF_TITLE_SETTLE + .55;                      // 2.21 — final hold, then it clears
+  /* Title span 2.50s -> 2.21s, 18% faster, all of it taken out of waiting.
+     Everything below is only nudged: the three gaps marked (was …) are the
+     dead beats where nothing was happening, and nothing else moved. */
+  const LF_ROAD_T0 = LF_TITLE_END, LF_ROAD_DUR = .6;               // 2.21 -> 2.81
+  const LF_CHARS_T0 = LF_ROAD_T0 + LF_ROAD_DUR + .15;              // 2.96  (was +.25)
   const LF_CHAR_HOLD = .4;                                         // per snap, as in meetArya
-  const LF_TOGETHER_T0 = LF_CHARS_T0 + 2 * LF_CHAR_HOLD;           // 4.35
-  const LF_SPLIT_T0 = LF_TOGETHER_T0 + .7;                         // 5.05
-  const LF_SPLIT_END = LF_SPLIT_T0 + 2 * LF_CHAR_HOLD;             // 5.85
-  const LF_LABEL_T0 = LF_SPLIT_END + .15;                          // 6.00
-  const LF_SLIDE_T0 = LF_LABEL_T0 + 2.0;                           // 8.00 — after the ~2s hold
-  const LF_SLIDE_DUR = 1.3;                                        // 9.3 = SCENE_SECONDS.lifeHappened
+  const LF_TOGETHER_T0 = LF_CHARS_T0 + 2 * LF_CHAR_HOLD;           // 3.76
+  const LF_SPLIT_T0 = LF_TOGETHER_T0 + .55;                        // 4.31  (was +.7)
+  const LF_SPLIT_END = LF_SPLIT_T0 + 2 * LF_CHAR_HOLD;             // 5.11
+  const LF_LABEL_T0 = LF_SPLIT_END + .15;                          // 5.26
+  const LF_SLIDE_T0 = LF_LABEL_T0 + 1.7;                           // 6.96  (was +2.0)
+  const LF_SLIDE_DUR = 1.3;                                        // 8.26 = SCENE_SECONDS.lifeHappened
 
   /* Measured off road_foreground.png (1670x942, painted rows 360-941): its
      centreline runs down x=865, which is 29px right of frame centre, so the
@@ -1057,7 +1076,15 @@ const SCENES = (() => {
   const OD_MERGE_T0 = OD_PLANE_T0 + OD_PLANE_DUR + OD_PLANE_B_LAG; // 3.65
   const OD_MERGE_DUR = 1.2;                                        // -> 4.85
   const OD_FRANCE_T0 = OD_MERGE_T0 + OD_MERGE_DUR + .1;            // 4.95
-  const OD_EXIT_T0 = 6.1, OD_EXIT_DUR = 1.3;                       // 6.10 -> 7.40, well inside the 8s scene
+  /* The exit is a TRANSITION, not a beat of its own: France holds, then the
+     plane snaps forward, the line whips after it, and the scene is cut the
+     moment it clears the frame. Two fast moves with a breath between them —
+     the same FAST MOVE -> HOLD -> FAST MOVE -> STOP the rest of the film
+     uses — rather than one long draw sitting on empty cream. 6.10 -> 6.62,
+     and SCENE_SECONDS.oneDay ends at 6.65 so nothing hangs after it. */
+  const OD_EXIT_T0 = 6.1;
+  const OD_EXIT_A = .18, OD_EXIT_HOLD = .12, OD_EXIT_B = .22;      // -> 6.62
+  const OD_EXIT_MID = .45;                                         // drawn by the first snap
 
   /* All of this was authored for the old 1000x1500 portrait frame, where the
      convergence point sat at y=1080 and the planes started at y=1420 — both
@@ -1150,74 +1177,167 @@ const SCENES = (() => {
       });
     }
 
-    /* 6.10  the line keeps going, past France and out of frame, into the
-       airport that opens the next scene */
-    const out = pl(qt, OD_EXIT_T0, OD_EXIT_DUR);
+    /* 6.10  France has held; the plane snaps forward, the line whips after
+       it, and the frame is cut the instant it clears the edge. Two discrete
+       moves with a hold between them — never one slow continuous draw. */
+    const elt = qt - OD_EXIT_T0;
+    const out = elt <= 0 ? 0
+      : elt < OD_EXIT_A ? OD_EXIT_MID * (elt / OD_EXIT_A)
+        : elt < OD_EXIT_A + OD_EXIT_HOLD ? OD_EXIT_MID
+          : OD_EXIT_MID + (1 - OD_EXIT_MID) *
+            clamp((elt - OD_EXIT_A - OD_EXIT_HOLD) / OD_EXIT_B);
     if (out > 0) {
-      g.trail(OD_MERGE_END, OD_EXIT_CP, OD_EXIT_END, out,
+      const head = g.trail(OD_MERGE_END, OD_EXIT_CP, OD_EXIT_END, out,
         { color: P.ink, lw: 9, dash: [26, 16] });
+      /* the plane leads the line out, exactly as it led it in */
+      if (out < 1) {
+        g.sprite('airplane', { x: head.x, y: head.y, h: 100, anchor: 'center', rot: head.angle });
+      }
     }
   }
 
   /* --------------------------------- 7. airport -> Paris -> the proposal --- */
 
-  /* Scene 6 picks the travel line up where Scene 5 dropped it — Scene 5
-     exits to the RIGHT, so this enters from the left and carries on in the
-     same direction. The line runs on a flat backdrop sampled from the
-     airport ceiling, so when the terminal rises it swallows the line
-     seamlessly instead of the line simply blinking out. */
+  /* Scene 5 now ends the instant its plane clears the frame, so the cut
+     lands straight on the terminal rising — there is no travel line and no
+     flat-colour pre-roll at the top of this scene any more. PA_SKY is only
+     what shows behind a set while it is still on its way up. */
   const PA_SKY = '#dcc1aa';
-  const PA_LINE_T0 = 0, PA_LINE_DUR = 1.0;
 
   /* Environment rhythm. The airport is three layers; the replacement river,
      Louvre and Eiffel art has no midground files, so those are two-layer. */
   const PA_ENV_BG = .65, PA_ENV_MID = .55, PA_ENV_FG = .50, PA_ENV_HOLD = .25;
-  const PA_MID_OFF = PA_ENV_BG + PA_ENV_HOLD;                         // 0.90
-  const PA_FG3_OFF = PA_MID_OFF + PA_ENV_MID + PA_ENV_HOLD;           // 1.70 (3-layer)
-  const PA_FG2_OFF = PA_ENV_BG + PA_ENV_HOLD;                         // 0.90 (2-layer)
-  const PA_ENV_SPAN = PA_FG3_OFF + PA_ENV_FG;                         // 2.20 (airport)
+  /* The airport background does not rise at all (bgSet — it is the target
+     of Scene 5's hard cut), so deriving the midground's start from
+     PA_ENV_BG left a 0.90s wait on a motionless picture for a rise that
+     never happened. These are now set directly: the midground follows
+     almost immediately and the foreground overlaps it, the same
+     coordinated reveal the garden and campus now use. */
+  const PA_MID_OFF = .18;                                             // L2 starts
+  const PA_FG3_OFF = .58;                                             // L3 starts, .15 before L2 settles
+  const PA_ENV_SPAN = PA_FG3_OFF + PA_ENV_FG;                         // 1.08 (airport)
 
-  /* The travel line is the transition device between every stop: it draws
-     across the place they are leaving, then the next place rises over it.
-     PA_LINE_LEAD is how long before a stop begins that its line starts. */
-  const PA_LINE_LEAD = 1.1, PA_HOP_DUR = .9;
+  /* The journey between stops, as one continuous move rather than an
+     animation followed by a wait:
 
-  const PA_AIRPORT_T0 = 1.1;
-  const PA_SEINE_T0 = 10.9;
-  const PA_LOUVRE_T0 = 14.9;
-  const PA_EIFFEL_T0 = 19.1;
+        story moment, couple still there
+        PA_LINE_DRAW   the travel line draws in — this IS the drag handle
+        [GATE]         the clock holds here until the viewer pulls the
+                       journey forward (or the fallback fires)
+        PA_SLIDE_DUR   the next destination slides in from the RIGHT
+        PA_SETTLE      a beat to land
+        story moment
+
+     Every stop's t0 below is the frame the gate releases on, so the slide
+     begins the instant the gesture completes — there is no gap between the
+     drag and the destination arriving. */
+  const PA_LINE_DRAW = .45;
+  const PA_SLIDE_DUR = .50;
+  const PA_SETTLE = .15;
+
+  /* The terminal starts building on the scene's very first frame. Every
+     other absolute time below came down by the same 1.1s, so the whole
+     scene keeps its approved internal rhythm exactly — nothing got longer
+     or shorter, the dead pre-roll simply went away and SCENE_SECONDS.paris
+     came down 24.6 -> 23.5 to match. */
+  const PA_AIRPORT_T0 = 0;
+  /* The destination times are derived from the airport story further down,
+     once PA_BIGHAPPY_T0 and the affordance timing exist. */
+
 
   /* The airport arrival — unchanged. */
-  const PA_ESTABLISH = .9;
+  /* .92 rather than .90 only so PA_RAHUL_T0 lands on a round 2.00 once the
+     dead wait above is gone; the arrival rhythm itself is untouched. */
+  /* Every beat of the arrival is kept — he arrives, she arrives, he reacts,
+     she reacts, they turn happy — only the waiting between them is trimmed.
+     The old chain sat on an empty terminal for .92s, then held 1.5s between
+     his reaction and hers, and the affordance did not appear until 7.60s.
+     (was -> now):  establish .92 -> .60, her entrance +1.0 -> +.70,
+     her reaction +1.5 -> +.85, turning happy +.70 -> +.60. */
+  const PA_ESTABLISH = .60;
   const PA_CHAR_HOLD = .45;
-  const PA_RAHUL_T0 = PA_AIRPORT_T0 + PA_ENV_SPAN + PA_ESTABLISH;     // 4.20
-  const PA_RAHUL_SET = PA_RAHUL_T0 + 2 * PA_CHAR_HOLD;                // 5.10
-  const PA_ARYA_T0 = PA_RAHUL_SET + 1.0;                              // 6.10
-  const PA_ARYA_SET = PA_ARYA_T0 + 2 * PA_CHAR_HOLD;                  // 7.00
-  const PA_RAHUL_SWAP = PA_ARYA_SET;                                  // 7.00
-  const PA_ARYA_SWAP = PA_ARYA_SET + 1.5;                             // 8.50
-  /* Happy and together before the first journey begins. */
-  const PA_BIGHAPPY_T0 = 9.2;
+  const PA_RAHUL_T0 = PA_AIRPORT_T0 + PA_ENV_SPAN + PA_ESTABLISH;     // 1.68
+  const PA_RAHUL_SET = PA_RAHUL_T0 + 2 * PA_CHAR_HOLD;                // 2.58
+  const PA_ARYA_T0 = PA_RAHUL_SET + .70;                              // 3.28
+  const PA_ARYA_SET = PA_ARYA_T0 + 2 * PA_CHAR_HOLD;                  // 4.18
+  const PA_RAHUL_SWAP = PA_ARYA_SET;                                  // 4.18
+  const PA_ARYA_SWAP = PA_ARYA_SET + .85;                             // 5.03
+  /* Happy and together — the end of the airport story. */
+  const PA_BIGHAPPY_T0 = PA_ARYA_SWAP + .60;                          // 5.63
 
-  /* Proposal, once the Eiffel foreground has settled. Quick and discrete. */
-  const PA_EIFFEL_SET = PA_EIFFEL_T0 + PA_FG2_OFF + PA_ENV_FG;        // 20.50
-  const PA_PROPOSE_T0 = PA_EIFFEL_SET + .35;                          // 20.85
-  const PA_ARYA_REACT_T0 = PA_PROPOSE_T0 + .15;                       // 21.00
-  const PA_ARYA_JOY_T0 = PA_ARYA_REACT_T0 + .35;                      // 21.35
-  const PA_WIPE_T0 = 23.0, PA_WIPE_DUR = 1.6;                         // -> 24.6
+  /* The single interaction. A plane noses in from the LEFT edge, stops, and
+     waits on a small white paper patch with a handwritten line under it; a
+     short RIGHTWARD pull sends it on and the Seine follows in from the
+     right. Its own geometry, kept well away from PA_HOPS so the affordance
+     never reads as one of the cinematic travel lines that play later.
 
-  const PA_LINE_0 = { x: -60, y: 760 }, PA_LINE_CP = { x: 500, y: 600 },
-        PA_LINE_END = { x: 1250, y: 320 };
+     The plane points RIGHT — the way it is about to go, and the way the
+     gesture goes. Offsets below are signed shifts of the whole assembly in
+     stage px: negative while it is still arriving from the left, positive
+     once it is being pulled away to the right.
+       PA_PULL_IN    how far left it starts, before the peek
+       PA_PULL_GIVE  how far it yields rightward under a full pull
+       PA_PULL_EXIT  how far it carries on once the gesture lands */
+  /* A short intentional beat on the happy pose, then the affordance noses
+     in. PA_PEEK_DUR settles it .05 before the gate parks, so it is genuinely
+     motionless while it waits rather than frozen mid-approach. */
+  const PA_PULL_LEAD = .45, PA_PEEK_DUR = .40;
+  const PA_PULL_T0 = PA_BIGHAPPY_T0 + PA_PULL_LEAD;                   // 6.08
+
+  /* ONE gate, at the airport only: the viewer starts the journey once and
+     the Seine, the Louvre and the Eiffel then follow on their own. Derived
+     from the story above, so the affordance can never drift back into a
+     long empty wait. main.js reads PA_GATES. */
+  const PA_SEINE_T0 = PA_PULL_T0 + PA_PEEK_DUR + .05;                 // 6.53
+  const PA_LEG = 3.30;                      // arrive, story moment, line out
+  const PA_LOUVRE_T0 = PA_SEINE_T0 + PA_LEG;                          // 9.83
+  const PA_EIFFEL_T0 = PA_LOUVRE_T0 + PA_LEG;                         // 13.13
+  /* 0.03 BEFORE the Seine's t0, not on it. `cur` advances on t >= t0, so a
+     gate sitting exactly on it would park the clock on the first frame that
+     already belongs to the Seine — and the airport's plane and prompt,
+     which only draw while cur === 0, would vanish for the whole hold. */
+  const PA_GATES = [PA_SEINE_T0 - .03];                               // 6.50
+  const PA_PULL_IN = 760, PA_PULL_GIVE = 62, PA_PULL_EXIT = 1560;
+  const PA_PULL_OUT = .38;
+  /* Parked in the clear band on the left: below the AIRPORT sign, above the
+     suitcase, and entirely left of Rahul (who spans x 691-981), so neither
+     the line nor the prompt crosses a character or the signage. */
+  /* Parked in the clear band on the left. The trail is BEHIND the plane, so
+     with the plane facing right the trail runs back to the left edge and the
+     plane sits at the right-hand end of it. */
+  const PA_PULL_A = { x: 232, y: 330 };         // the trail, behind it
+  const PA_PULL_CP = { x: 366, y: 356 };
+  const PA_PULL_B = { x: 508, y: 380 };         // the plane itself
+  const PA_PULL_LABEL = { x: 430, y: 486, size: 52 };
+  /* The white paper patch the whole thing sits on, so it reads against the
+     busy terminal. Wraps the content; no border, no shadow, no card. */
+  const PA_PULL_PAD = { x0: 168, y0: 300, x1: 700, y1: 522, r: 46 };
+
+  /* Proposal, once the Eiffel foreground has settled. Every swap here is an
+     instant cutout change — the only thing that is slow is the HOLD on her
+     surprise, which is the payoff the whole travel sequence is built to
+     reach, so it gets a full two seconds before she breaks into joy. */
+  const PA_EIFFEL_SET = PA_EIFFEL_T0 + PA_SLIDE_DUR + PA_SETTLE;      // 15.30
+  const PA_PROPOSE_T0 = PA_EIFFEL_SET + .35;                          // 15.65
+  const PA_ARYA_REACT_T0 = PA_PROPOSE_T0 + .15;                       // 15.80
+  const PA_ARYA_SURPRISE_HOLD = 2.0;
+  const PA_ARYA_JOY_T0 = PA_ARYA_REACT_T0 + PA_ARYA_SURPRISE_HOLD;    // 17.80
+  const PA_WIPE_T0 = PA_ARYA_JOY_T0 + .80, PA_WIPE_DUR = 1.6;         // 17.08 -> 18.68                         // -> 23.5
 
   /* Every coordinate below is read off the replacement artwork, not carried
      over from the old assets:
 
-       river_foreground IS the boat (1983x793). Fitted to the stage width and
-       sat on the bottom edge it occupies y 272-941, and its seating first
-       covers a character at y~495 across the middle. So the two of them are
-       placed so only head and torso clear that line — they read as sitting
-       down inside it — and the cases are set high enough that their tops
-       show above the seat rather than being swallowed entirely.
+       river_foreground IS the boat (1983x793) — a cockpit view looking
+       forward over the seating. Fitted to the stage width and sat on the
+       bottom edge it occupies y 272-941, so a couple drawn underneath it
+       disappears into the upholstery.
+
+       `front` is a deliberate exception to the film's usual layer order, and
+       it applies to the Seine and the Louvre ONLY: at those two stops the
+       environment is built complete — background, foreground and all — and
+       then the couple and their cases are laid over the top of it, so
+       nothing can swallow them. Everywhere else in the film the foreground
+       still goes last.
 
        louvre_background (1536x1024) puts the paved courtyard at source row
        660; fitted to width and hung from the top of the frame that lands at
@@ -1225,12 +1345,24 @@ const SCENES = (() => {
 
        eiffel_background (1536x1024) puts the esplanade at source row 745 ->
        frame y 811, so they stand at 880 with the tower rising between them. */
+  const PA_FLOOR = GY + 62;                                           // 802
   const PA_STOPS = [
-    { t0: PA_AIRPORT_T0, bg: 'airportBg', mid: 'airportMid', fg: 'airportFg', full: true,
-      rx: CX, ax: 1140, feet: GY, cases: true, caseY: GY, caseDX: 168, caseH: 250 },
-    { t0: PA_SEINE_T0, bg: 'riverBg', fg: 'riverFg',
-      rx: 720, ax: 962, feet: 820, cases: true, caseY: 668, caseDX: 188, caseH: 250 },
-    { t0: PA_LOUVRE_T0, bg: 'louvreBg', fg: 'louvreFg',
+    /* The terminal floor sits lower than the film's shared GY: standing at
+       740 they read as hovering a little above the tiles. PA_FLOOR drops
+       both of them and both cases onto the floor plane itself. Airport
+       only — GY is shared with every other scene and must not move. */
+    { t0: PA_AIRPORT_T0, bg: 'airportBg', mid: 'airportMid', fg: 'airportFg', full: true, bgSet: true,
+      rx: CX, ax: 1140, feet: PA_FLOOR, cases: true, caseY: PA_FLOOR, caseDX: 168, caseH: 250 },
+    /* fgScale/fgDx/fgDy pull the boat back and over to one side without
+       touching the river behind it:
+       the background is drawn exactly as before, only the boat shrinks and
+       drops, so more of the Seine shows around it. The couple and the cases
+       are authored in the boat's original space and carried through the
+       same transform, so they stay standing in it. */
+    { t0: PA_SEINE_T0, bg: 'riverBg', fg: 'riverFg', front: true,
+      fgScale: .68, fgDx: 250, fgDy: 130, charK: 1.36,
+      rx: 680, ax: 996, feet: 697, cases: true, caseY: 697, caseDX: 165, caseH: 250 },
+    { t0: PA_LOUVRE_T0, bg: 'louvreBg', fg: 'louvreFg', front: true,
       rx: 700, ax: 980, feet: 850, cases: true, caseY: 850, caseDX: 196, caseH: 235 },
     { t0: PA_EIFFEL_T0, bg: 'eiffelBg', fg: 'eiffelFg',
       rx: 700, ax: 980, feet: 880, cases: false },
@@ -1257,32 +1389,58 @@ const SCENES = (() => {
 
   function paris(g, t) {
     const bgW = C.STAGE.logicalW, bgH = C.STAGE.logicalH;
+    /* cleared every frame; only the airport affordance sets it */
+    g.hit = null;
 
     /* One layer at whatever point of its rise it is in. `full` art matches
        the stage exactly; everything else is fitted to WIDTH and allowed to
        overflow vertically, so nothing is ever stretched to fit the frame. */
-    const layer = (key, prog, rise, mode) => {
-      const o = { x: CX, w: bgW };
+    /* `full` art (the airport) matches the stage and still builds in place.
+       A destination instead slides in HORIZONTALLY: at prog 0 it sits one
+       full frame-width to the right, at prog 1 it is home. Background and
+       foreground share one prog, so the world arrives as a single piece and
+       the old destination underneath is never uncovered. */
+    const layer = (key, prog, rise, mode, k, dy, dx) => {
+      const slide = mode === 'full' ? 0 : (1 - prog) * bgW;
+      const o = { x: CX + (dx || 0) + slide, w: bgW * (k || 1) };
       if (mode === 'full') { o.h = bgH; o.y = bgH / 2 + (1 - prog) * rise; o.anchor = 'center'; }
-      else if (mode === 'bg') { o.y = (1 - prog) * rise; o.anchor = 'top'; }
-      else { o.y = bgH + (1 - prog) * rise; o.anchor = 'bottom'; }
+      else if (mode === 'bg') { o.y = 0; o.anchor = 'top'; }
+      else { o.y = bgH + (dy || 0); o.anchor = 'bottom'; }
       g.sprite(key, o);
     };
     const drawStop = (s, prog) => {
-      layer(s.bg, prog, 620 * SY, s.full ? 'full' : 'bg');
+      /* bgSet: this set's background is not slid into place, it is simply
+         already there. The airport uses it because Scene 5 hard-cuts into
+         this scene — if the terminal rose from below, the cut would land on
+         a band of flat colour instead of on the illustration. Its midground
+         and foreground still build in on the beats below. */
+      layer(s.bg, s.bgSet ? 1 : prog, 620 * SY, s.full ? 'full' : 'bg');
       if (s.mid) layer(s.mid, s.full ? p(t, s.t0 + PA_MID_OFF, PA_ENV_MID, ease.out) : prog, 560 * SY, 'full');
     };
     const drawStopFg = (s, prog) =>
-      layer(s.fg, prog, 500 * SY, s.full ? 'full' : 'fg');
+      layer(s.fg, prog, 500 * SY, s.full ? 'full' : 'fg', s.fgScale, s.fgDy, s.fgDx);
+
+    /* A stop may shrink, drop and shift its foreground alone — the Seine
+       does, so the boat sits off to one side with open river beside it —
+       while its BACKGROUND stays exactly where it is. Everything that
+       belongs to that foreground (the couple, their cases) has to travel
+       with it or they stop being in it, so the authored coordinates below
+       are read in the foreground's own space and mapped through here rather
+       than being re-typed by hand. */
+    const fgXf = (s) => {
+      const k = s.fgScale || 1;
+      if (k === 1 && !s.fgDy && !s.fgDx) return { k: 1, x: x => x, y: y => y };
+      const im = g.img(s.fg);
+      const h0 = im && im.width ? bgW * im.height / im.width : bgH;
+      const top0 = bgH - h0, top1 = bgH + (s.fgDy || 0) - h0 * k;
+      const dx = s.fgDx || 0;
+      return { k, x: x => CX + (x - CX) * k + dx, y: y => top1 + (y - top0) * k };
+    };
 
     g.ctx.save();
     g.ctx.fillStyle = PA_SKY;
     g.ctx.fillRect(0, 0, bgW, bgH);
     g.ctx.restore();
-
-    /* the journey in from Scene 5 */
-    const line = pl(q(t, C.STAGE.choppy), PA_LINE_T0, PA_LINE_DUR);
-    if (line > 0) g.trail(PA_LINE_0, PA_LINE_CP, PA_LINE_END, line, { color: P.ink, lw: 9, dash: [26, 16] });
 
     let cur = -1;
     PA_STOPS.forEach((s, i) => { if (t >= s.t0) cur = i; });
@@ -1290,42 +1448,42 @@ const SCENES = (() => {
     const prev = cur > 0 ? PA_STOPS[cur - 1] : null;
     if (!stop) return;
 
-    const bgProg = p(t, stop.t0, PA_ENV_BG, ease.out);
-    const fgProg = p(t, stop.t0 + (stop.full ? PA_FG3_OFF : PA_FG2_OFF), PA_ENV_FG, ease.out);
+    /* The airport builds in place at the opening pace; a destination is one
+       horizontal slide, background and foreground together. */
+    const slideProg = stop.full ? 1 : p(t, stop.t0, PA_SLIDE_DUR, ease.out);
+    const bgProg = stop.full ? p(t, stop.t0, PA_ENV_BG, ease.out) : slideProg;
+    const fgProg = stop.full ? p(t, stop.t0 + PA_FG3_OFF, PA_ENV_FG, ease.out) : slideProg;
 
     const next = PA_STOPS[cur + 1];
     const hopInk = { color: P.ink, lw: 9, dash: [26, 16] };
 
-    /* the place they are leaving stays complete until the new background
-       has fully risen over it — a set change is one world covering another */
-    if (prev && bgProg < 1) {
+    /* The place they are leaving stays complete underneath until the new one
+       has finished sliding over it, so the frame is full the whole way and
+       no canvas edge is ever exposed. */
+    if (prev && slideProg < 1) {
       drawStop(prev, 1); drawStopFg(prev, 1);
-      /* the hop that brought us here, still lying across the old world as
-         the new one rises up and buries it */
+      /* the line they travelled, still lying across the old world */
       const h = PA_HOPS[cur - 1];
       g.trail(h.p0, h.cp, h.p1, 1, hopInk);
     }
 
     drawStop(stop, bgProg);
 
-    /* the hop OUT of here — drawn over the place we are still standing in,
-       from PA_LINE_LEAD before the next stop begins. This is the transition
-       device: the line goes, then the next world rises over it. */
-    if (next) {
-      const hp = pl(q(t, C.STAGE.choppy), next.t0 - PA_LINE_LEAD, PA_HOP_DUR);
-      if (hp > 0) {
-        const h = PA_HOPS[cur];
-        g.trail(h.p0, h.cp, h.p1, hp, hopInk);
-      }
-    }
 
-    /* --- the couple, between the background and the foreground --- */
+    /* --- the couple --- */
 
-    /* They are only on screen at a stop, never during a hop: the travel line
-       is what is moving between places, so they are hidden from the moment
-       the next line starts until the new background has settled. */
-    const gone = next && t >= next.t0 - PA_LINE_LEAD;
-    const here = stop.full ? t >= PA_RAHUL_T0 : bgProg >= 1;
+    /* They hold their stop right up to the moment the journey moves — the
+       gate frame — and are gone while the world slides. */
+    const gone = next && t >= next.t0;
+    /* A destination has to have arrived and settled before they are in it. */
+    const here = stop.full ? t >= PA_RAHUL_T0
+      : t >= stop.t0 + PA_SLIDE_DUR + PA_SETTLE;
+
+    /* THE EXCEPTION: at the Seine and the Louvre the foreground goes down
+       first and the couple go over the top of it, so the boat and the
+       courtyard furniture can never hide them. Everywhere else the
+       foreground still goes last, below. */
+    if (stop.front) drawStopFg(stop, fgProg);
 
     if (here && !gone) {
       if (stop.full) {
@@ -1347,17 +1505,117 @@ const SCENES = (() => {
           g.sprite(paAryaPose(t), { x: as.x, y: stop.feet, h: CHAR_H, rot: as.rot });
         }
       } else {
-        /* every later stop: they are simply there, and completely still */
+        /* every later stop: they are simply there, and completely still,
+           riding whatever scale and drop that stop's foreground has */
+        const f = fgXf(stop);
+        /* charK is how big a passenger is against the set they are in — the
+           Seine needs it because you are looking down the length of a boat,
+           so people standing in it are much smaller than the hull framing
+           the shot. Everywhere else it is 1 and nothing changes. */
+        const ck = f.k * (stop.charK || 1);
         if (stop.cases) {
-          g.sprite('rahulSuitcase', { x: stop.rx - stop.caseDX, y: stop.caseY, h: stop.caseH });
-          g.sprite('aryaSuitcase', { x: stop.ax + stop.caseDX, y: stop.caseY, h: stop.caseH });
+          g.sprite('rahulSuitcase', { x: f.x(stop.rx - stop.caseDX), y: f.y(stop.caseY), h: stop.caseH * ck });
+          g.sprite('aryaSuitcase', { x: f.x(stop.ax + stop.caseDX), y: f.y(stop.caseY), h: stop.caseH * ck });
         }
-        g.sprite(paRahulPose(t), { x: stop.rx, y: stop.feet, h: CHAR_H });
-        g.sprite(paAryaPose(t), { x: stop.ax, y: stop.feet, h: CHAR_H });
+        g.sprite(paRahulPose(t), { x: f.x(stop.rx), y: f.y(stop.feet), h: CHAR_H * ck });
+        g.sprite(paAryaPose(t), { x: f.x(stop.ax), y: f.y(stop.feet), h: CHAR_H * ck });
       }
     }
 
-    drawStopFg(stop, fgProg);
+    if (!stop.front) drawStopFg(stop, fgProg);
+
+    /* The line OUT of here, drawn last so nothing can cover it. It lays
+       itself across the place they are still standing in — they stay in
+       frame while it does, so the journey reads as leaving somewhere rather
+       than cutting away from it — and then the clock holds on the finished
+       line while the viewer pulls it forward.
+
+       g.drag is 0..1, handed in by the director while a gate is open: the
+       plane at the head of the line eases forward under the finger, so the
+       gesture feels like it is moving the journey. It is not a second
+       animation; it is the same line and the same plane, nudged. */
+    if (next && cur === 0) {
+      /* THE interaction. Peek in, stop dead, wait. Nothing here moves on its
+         own once it has arrived — the only thing that shifts it is the
+         finger, and then the release. */
+      const peek = p(t, PA_PULL_T0, PA_PEEK_DUR, ease.out);
+      if (peek > 0) {
+        const drag = clamp(g.drag || 0);
+        const off = (1 - peek) * -PA_PULL_IN            // still arriving
+          + drag * PA_PULL_GIVE                          // yielding to the pull
+          + ease.in(pl(t, next.t0, PA_PULL_OUT)) * PA_PULL_EXIT;   // gone
+        const sh = pt => ({ x: pt.x + off, y: pt.y });
+
+        /* the paper patch, first, so everything else sits on it */
+        const pad = PA_PULL_PAD, px0 = pad.x0 + off, px1 = pad.x1 + off;
+        g.ctx.save();
+        g.ctx.globalAlpha = .93;
+        g.ctx.fillStyle = '#ffffff';
+        g.ctx.beginPath();
+        g.ctx.moveTo(px0 + pad.r, pad.y0);
+        g.ctx.lineTo(px1 - pad.r, pad.y0);
+        g.ctx.quadraticCurveTo(px1, pad.y0, px1, pad.y0 + pad.r);
+        g.ctx.lineTo(px1, pad.y1 - pad.r);
+        g.ctx.quadraticCurveTo(px1, pad.y1, px1 - pad.r, pad.y1);
+        g.ctx.lineTo(px0 + pad.r, pad.y1);
+        g.ctx.quadraticCurveTo(px0, pad.y1, px0, pad.y1 - pad.r);
+        g.ctx.lineTo(px0, pad.y0 + pad.r);
+        g.ctx.quadraticCurveTo(px0, pad.y0, px0 + pad.r, pad.y0);
+        g.ctx.fill();
+        g.ctx.restore();
+
+        /* the drag target, in stage coordinates, published for main.js —
+           the patch plus a generous margin, never the whole frame */
+        g.hit = { x0: px0 - 70, y0: pad.y0 - 70, x1: px1 + 70, y1: pad.y1 + 70 };
+
+        g.trail(sh(PA_PULL_A), sh(PA_PULL_CP), sh(PA_PULL_B), 1, hopInk);
+        /* nose pointing the way it is about to go — and the way to pull */
+        g.sprite('airplane', {
+          x: PA_PULL_B.x + off, y: PA_PULL_B.y, h: 104, anchor: 'center',
+        });
+
+        /* The prompt, in the film's own handwriting, sitting under the
+           plane so the two read as one object. It goes the moment the
+           gesture is clearly under way, and never comes back — there is no
+           second gate to prompt for. Patrick Hand has no U+2190, so the
+           arrow is stroked rather than typed; a text arrow renders as an
+           empty box. */
+        /* <= next.t0, not <: the clock parks exactly ON the gate frame for
+           the whole hold, so a strict < would never show the prompt at all. */
+        if (peek >= .9 && t <= next.t0 && drag < .12) {
+          const lx = PA_PULL_LABEL.x + off;
+          g.text('drag to travel', {
+            x: lx, y: PA_PULL_LABEL.y, size: PA_PULL_LABEL.size,
+            font: 'handwriting', color: P.ink, outline: 0, rot: -1.5,
+          });
+          /* arrow pointing RIGHT, matching the plane and the gesture.
+             Stroked rather than typed: Patrick Hand has no arrow glyph, so
+             a text arrow renders as an empty box. */
+          const ax = lx + 138, ay = PA_PULL_LABEL.y - 16;
+          g.ctx.save();
+          g.ctx.strokeStyle = P.ink;
+          g.ctx.lineWidth = 6;
+          g.ctx.beginPath();
+          g.ctx.moveTo(ax, ay);
+          g.ctx.lineTo(ax + 52, ay);
+          g.ctx.moveTo(ax + 35, ay - 13);
+          g.ctx.lineTo(ax + 52, ay);
+          g.ctx.lineTo(ax + 35, ay + 13);
+          g.ctx.stroke();
+          g.ctx.restore();
+        }
+      }
+    } else if (next) {
+      /* every later leg is purely cinematic — no prompt, no gate, no drag */
+      const hp = pl(q(t, C.STAGE.choppy), next.t0 - PA_LINE_DRAW, PA_LINE_DRAW);
+      if (hp > 0) {
+        const h = PA_HOPS[cur];
+        const head = g.trail(h.p0, h.cp, h.p1, hp, hopInk);
+        g.sprite('airplane', {
+          x: head.x, y: head.y, h: 92, anchor: 'center', rot: head.angle,
+        });
+      }
+    }
 
     /* the existing hand-off into Scene 7 */
     const sp = pl(t, PA_WIPE_T0, .5);
@@ -1370,21 +1628,344 @@ const SCENES = (() => {
 
   /* ----------------------------------- 8. sangeet, wedding, reception ----- */
 
+  /* --- the sangeet card -------------------------------------------------
+     A flat festive field rather than a room: the night itself is the set,
+     so the couple, the decorations and the type carry everything. Deep
+     indigo is the one colour in the palette that lets marigold type, cream
+     lehenga, gold disco ball and four confetti colours all sit at full
+     strength at once — chilli or leaf would swallow one of them.
+
+     sangeet_1 is 1024x1536 with art 0.621 wide per unit tall; sangeet_2 is
+     1100x1047 at 1.051 — a dip, so it is shorter and much wider. Drawn at
+     one height the couple would visibly jump scale between poses, so pose 2
+     is drawn at SG_POSE2_K of pose 1's height, which matches the figures
+     rather than the frames. Both are centred in their art and stand on its
+     bottom edge, so one shared ground line works for both. */
+  const SG_BG = P.navy;
+  const SG_POSE_HOLD = 1.0;                   // ~1s per pose, instant swaps
+  const SG_POSE2_K = .88;
+
+  const SG_DECOR_T0 = .15;
+  const SG_TITLE_T0 = .34;
+  const SG_DETAIL_T0 = .68, SG_DETAIL_GAP = .13;
+  const SG_COUPLE_T0 = 1.02;
+
+  const SG_TITLE = { y: 232, size: 218 };
+  const SG_VAL_Y = 556, SG_LAB_Y = 616;
+  const SG_LEFT_X = 398, SG_RIGHT_X = 1300;
+  const SG_COUPLE = { base: 925, h: 604 };
+  const SG_LIGHTS = { x: 236, y: 0, h: 336 };
+  const SG_BALL = { x: 1436, y: -8, h: 356 };
+
+  /* Twinkles sit on the ball's own gold, offset from its centre. Each one
+     runs its own short flash on its own phase, so they never pulse together
+     and never rotate — a flash is three discrete steps and then nothing. */
+  const SG_SPARK_CYCLE = 1.15, SG_SPARK_STEP = .1;
+  const SG_SPARK_SCALE = [.5, 1, .66];
+  /* Offsets are measured against the ball's drawn sphere, which sits at
+     x 1355-1522, y 154-340 once the art is fitted — so every twinkle lands
+     on its gold or just off its rim, never adrift beside the title. */
+  const SG_SPARKS = [
+    { dx: -80, dy: 190, s: 15 }, { dx: 78, dy: 170, s: 19 },
+    { dx: -52, dy: 298, s: 13 }, { dx: 66, dy: 292, s: 15 },
+    { dx: 6, dy: 126, s: 17 }, { dx: -14, dy: 350, s: 12 },
+  ];
+
+  /* Confetti lives in the margins only — two side columns and a band across
+     the top — so the title and the two detail blocks always stay clean. It
+     does not fall: on each beat one of three groups jumps down a fixed step
+     and then holds, which is the same stop-motion rule the characters use. */
+  const SG_CONF_BEAT = .42, SG_CONF_DROP = 74;
+  /* Each zone wraps within itself, so a top-band piece shuffles along the
+     band instead of drifting down across SANGEET. */
+  const SG_CONF_ZONES = [
+    { x0: 46, xw: 244, top: 150, span: 700 },
+    { x0: 1486, xw: 146, top: 150, span: 700 },
+    { x0: 60, xw: 1550, top: 22, span: 104 },
+  ];
+  const SG_CONF_N = 24;
+  const SG_CONF_COLS = [P.marigold, P.rose, P.paper, P.leaf, P.chilli];
+
+  /* One confetti implementation, shared by every event card — only the
+     palette changes, so the two cards read as one visual system. */
+  function cardConfetti(g, tb, cols) {
+    const beat = Math.floor(tb / SG_CONF_BEAT);
+    for (let n = 0; n < SG_CONF_N; n++) {
+      const z = SG_CONF_ZONES[n % 8 < 3 ? 0 : n % 8 < 6 ? 1 : 2];
+      const x = z.x0 + rnd(n) * z.xw;
+      const y0 = rnd(n + 5) * z.span;
+
+      /* how many beats this piece has taken, one group of three per beat */
+      const moves = Math.floor((beat - (n % 3) + 3) / 3);
+      const y = z.top + ((y0 + moves * SG_CONF_DROP) % z.span);
+      const rot = rnd(n + 17) * 360 + moves * 41;
+
+      g.ctx.save();
+      g.ctx.translate(x, y);
+      g.ctx.rotate(rot * Math.PI / 180);
+      g.ctx.fillStyle = cols[n % cols.length];
+      g.ctx.fillRect(-7, -13, 14, 26);
+      g.ctx.restore();
+    }
+  }
+
+  function sangeetCard(g, tb, ev) {
+    const bgW = C.STAGE.logicalW, bgH = C.STAGE.logicalH;
+
+    g.ctx.save();
+    g.ctx.fillStyle = SG_BG;
+    g.ctx.fillRect(0, 0, bgW, bgH);
+    g.ctx.restore();
+
+    /* --- confetti, behind everything else --- */
+    cardConfetti(g, tb, SG_CONF_COLS);
+
+    /* --- hanging decorations, dropped in on the first beat --- */
+    const dec = lifePunch(tb - SG_DECOR_T0);
+    if (dec) {
+      g.sprite('lights', { x: SG_LIGHTS.x, y: SG_LIGHTS.y, h: SG_LIGHTS.h, anchor: 'top', scale: dec.scale });
+      g.sprite('discoball', { x: SG_BALL.x, y: SG_BALL.y, h: SG_BALL.h, anchor: 'top', scale: dec.scale });
+
+      /* the twinkles — only once the ball has actually landed */
+      if (tb > SG_DECOR_T0 + .2) {
+        SG_SPARKS.forEach((sp, k) => {
+          const lt = (tb + k * (SG_SPARK_CYCLE / SG_SPARKS.length)) % SG_SPARK_CYCLE;
+          const step = Math.floor(lt / SG_SPARK_STEP);
+          if (step >= SG_SPARK_SCALE.length) return;      // dark, holding
+          g.star(SG_BALL.x + sp.dx, SG_BALL.y + sp.dy, sp.s * SG_SPARK_SCALE[step],
+            { fill: P.paper, rot: 8 });
+        });
+      }
+    }
+
+    /* --- the couple: two poses, instant swaps, static through each hold --- */
+    const cp = lifePunch(tb - SG_COUPLE_T0);
+    if (cp) {
+      const two = Math.floor((tb - SG_COUPLE_T0) / SG_POSE_HOLD) % 2 === 1;
+      g.sprite(two ? 'sangeet2' : 'sangeet1', {
+        x: CX, y: SG_COUPLE.base, h: SG_COUPLE.h * (two ? SG_POSE2_K : 1),
+        scale: cp.scale,
+      });
+    }
+
+    /* --- SANGEET, the strongest thing on the card --- */
+    const tp = lifePunch(tb - SG_TITLE_T0);
+    if (tp) {
+      g.text(ev.name, {
+        x: CX, y: SG_TITLE.y, size: SG_TITLE.size, font: 'title',
+        color: P.marigold, outline: 0, scale: tp.scale, rot: tp.rot,
+      });
+    }
+
+    /* --- venue and time, side by side rather than stacked --- */
+    const block = (x, value, label, vSize, k) => {
+      const bp = lifePunch(tb - (SG_DETAIL_T0 + k * SG_DETAIL_GAP));
+      if (!bp) return;
+      g.text(value, {
+        x, y: SG_VAL_Y, size: vSize, font: 'handwriting', color: P.paper,
+        outline: 0, scale: bp.scale, rot: bp.rot,
+      });
+      g.text(label, {
+        x, y: SG_LAB_Y, size: 36, font: 'handwriting', color: P.marigold,
+        ls: 6, outline: 0, scale: bp.scale,
+      });
+    };
+    block(SG_LEFT_X, ev.venue, 'VENUE', 82, 0);
+    block(SG_RIGHT_X, ev.time, 'TIME', 58, 1);
+  }
+
+
+  /* --- the wedding card ------------------------------------------------
+     The sangeet card's sibling: same title size and baseline, same punch
+     timings, same 1s pose loop, same confetti, same hang-from-the-top
+     decoration grammar. Only the field colour, the art and the framing
+     change — marigold instead of indigo, garlands left and umbrellas
+     right instead of lights and a disco ball.
+
+     wedding_1 and wedding_2 are both 1536x1024 and both figures fill the
+     art's full height, so unlike the sangeet dip this pair needs no height
+     correction — one height gives both poses the same figure scale. What
+     they do need is a horizontal nudge: pose 1's art sits 39px right of its
+     frame's centre and pose 2's 16px, so drawn at a shared x the couple
+     would jog sideways on every swap. WD_DX cancels that. */
+  const WD_BG = P.marigold;
+  const WD_CONF_COLS = [P.chilli, P.rose, P.paper, P.leaf, P.navy];
+
+  const WD_TITLE = { y: SG_TITLE.y, size: SG_TITLE.size };
+  const WD_VAL_Y = 336, WD_LAB_Y = 396;
+  const WD_LEFT_X = 545, WD_RIGHT_X = 1145;
+  const WD_COUPLE = { base: 925, h: 500, dx1: -39, dx2: -16 };
+  const WD_GARLANDS = { x: 120, y: 0, h: 560 };
+  const WD_UMBRELLA = { x: 1570, y: 0, h: 520 };
+
+  function weddingCard(g, tb, ev) {
+    const bgW = C.STAGE.logicalW, bgH = C.STAGE.logicalH;
+
+    g.ctx.save();
+    g.ctx.fillStyle = WD_BG;
+    g.ctx.fillRect(0, 0, bgW, bgH);
+    g.ctx.restore();
+
+    cardConfetti(g, tb, WD_CONF_COLS);
+
+    /* --- hanging decorations, dropped in on the first beat, then static.
+       Both run off their own edge, which is what makes them read as
+       framing rather than as objects placed in the scene. */
+    const dec = lifePunch(tb - SG_DECOR_T0);
+    if (dec) {
+      g.sprite('garlands', { x: WD_GARLANDS.x, y: WD_GARLANDS.y, h: WD_GARLANDS.h, anchor: 'top', scale: dec.scale });
+      g.sprite('umbrella', { x: WD_UMBRELLA.x, y: WD_UMBRELLA.y, h: WD_UMBRELLA.h, anchor: 'top', scale: dec.scale });
+    }
+
+    /* --- the couple: two poses, instant swaps, static through each hold --- */
+    const cp = lifePunch(tb - SG_COUPLE_T0);
+    if (cp) {
+      const two = Math.floor((tb - SG_COUPLE_T0) / SG_POSE_HOLD) % 2 === 1;
+      g.sprite(two ? 'wedding2' : 'wedding1', {
+        x: CX + (two ? WD_COUPLE.dx2 : WD_COUPLE.dx1),
+        y: WD_COUPLE.base, h: WD_COUPLE.h, scale: cp.scale,
+      });
+    }
+
+    /* --- WEDDING, the strongest thing on the card --- */
+    const tp = lifePunch(tb - SG_TITLE_T0);
+    if (tp) {
+      g.text(ev.name, {
+        x: CX, y: WD_TITLE.y, size: WD_TITLE.size, font: 'title',
+        color: P.chilli, outline: 0, scale: tp.scale, rot: tp.rot,
+      });
+    }
+
+    /* --- venue and time, side by side rather than stacked --- */
+    const block = (x, value, label, k) => {
+      const bp = lifePunch(tb - (SG_DETAIL_T0 + k * SG_DETAIL_GAP));
+      if (!bp) return;
+      g.text(value, {
+        x, y: WD_VAL_Y, size: 58, font: 'handwriting', color: P.ink,
+        outline: 0, scale: bp.scale, rot: bp.rot,
+      });
+      g.text(label, {
+        x, y: WD_LAB_Y, size: 36, font: 'handwriting', color: P.chilli,
+        ls: 6, outline: 0, scale: bp.scale,
+      });
+    };
+    block(WD_LEFT_X, ev.venue, 'VENUE', 0);
+    block(WD_RIGHT_X, ev.time, 'TIME', 1);
+  }
+
+
+  /* --- the reception card ----------------------------------------------
+     The third panel of the triptych, built from the same parts as the other
+     two: same punch timings, same 1s pose loop, same confetti helper, same
+     hang-from-the-top decoration grammar, same two side-by-side detail
+     blocks above the couple that the wedding card uses.
+
+     Plum is the one colour here that is not from PALETTE — the palette has
+     no purple, and blue and gold are already spoken for by sangeet and
+     wedding. Gold type and gold decor sit on it the way they do on indigo.
+
+     RECEPTION is nine letters against seven, so at a shared point size it
+     would run 1112px wide and crowd both decorations. REC_TITLE.size 180
+     renders it 918px — the same physical width as SANGEET (919) and
+     WEDDING (929), which is the consistency that actually reads on screen.
+
+     reception_1 and reception_2 are both 1231x1277 with their art centred
+     within 6px of each other, so unlike the wedding pair they need no
+     horizontal correction and no height correction. */
+  const REC_BG = '#4e1f4a';
+  const REC_CONF_COLS = ['#e8e8ea', '#c7ccd4', '#f4f4f6', '#a9b0bb', '#dfe3e8'];
+
+  const REC_TITLE = { y: SG_TITLE.y, size: 180 };
+  const REC_VAL_Y = WD_VAL_Y, REC_LAB_Y = WD_LAB_Y;
+  const REC_LEFT_X = 585, REC_RIGHT_X = 1130;
+  const REC_COUPLE = { base: WD_COUPLE.base, h: WD_COUPLE.h };
+  const REC_STRINGS = { x: 120, y: 0, h: 580 };
+  const REC_CHANDELIER = { x: 1500, y: 0, h: 680 };
+
+  function receptionCard(g, tb, ev) {
+    const bgW = C.STAGE.logicalW, bgH = C.STAGE.logicalH;
+
+    g.ctx.save();
+    g.ctx.fillStyle = REC_BG;
+    g.ctx.fillRect(0, 0, bgW, bgH);
+    g.ctx.restore();
+
+    cardConfetti(g, tb, REC_CONF_COLS);
+
+    /* --- hanging decorations, dropped in on the first beat, then static --- */
+    const dec = lifePunch(tb - SG_DECOR_T0);
+    if (dec) {
+      g.sprite('strings', { x: REC_STRINGS.x, y: REC_STRINGS.y, h: REC_STRINGS.h, anchor: 'top', scale: dec.scale });
+      g.sprite('chandelier', { x: REC_CHANDELIER.x, y: REC_CHANDELIER.y, h: REC_CHANDELIER.h, anchor: 'top', scale: dec.scale });
+    }
+
+    /* --- the couple: two poses, instant swaps, static through each hold --- */
+    const cp = lifePunch(tb - SG_COUPLE_T0);
+    if (cp) {
+      const two = Math.floor((tb - SG_COUPLE_T0) / SG_POSE_HOLD) % 2 === 1;
+      g.sprite(two ? 'reception2' : 'reception1', {
+        x: CX, y: REC_COUPLE.base, h: REC_COUPLE.h, scale: cp.scale,
+      });
+    }
+
+    /* --- RECEPTION, the strongest thing on the card --- */
+    const tp = lifePunch(tb - SG_TITLE_T0);
+    if (tp) {
+      g.text(ev.name, {
+        x: CX, y: REC_TITLE.y, size: REC_TITLE.size, font: 'title',
+        color: P.marigold, outline: 0, scale: tp.scale, rot: tp.rot,
+      });
+    }
+
+    /* --- venue and time, side by side rather than stacked --- */
+    const block = (x, value, label, k) => {
+      const bp = lifePunch(tb - (SG_DETAIL_T0 + k * SG_DETAIL_GAP));
+      if (!bp) return;
+      g.text(value, {
+        x, y: REC_VAL_Y, size: 58, font: 'handwriting', color: P.paper,
+        outline: 0, scale: bp.scale, rot: bp.rot,
+      });
+      g.text(label, {
+        x, y: REC_LAB_Y, size: 36, font: 'handwriting', color: P.marigold,
+        ls: 6, outline: 0, scale: bp.scale,
+      });
+    };
+    block(REC_LEFT_X, ev.venue, 'VENUE', 0);
+    block(REC_RIGHT_X, ev.time, 'TIME', 1);
+  }
+
   function celebrations(g, t) {
     const each = C.SCENE_SECONDS.celebrations / C.EVENTS.length;
-
-    /* the sparkle from the proposal collapses away */
-    const shrink = 1 - ease.out(pl(t, 0, .7));
-    if (shrink > 0) {
-      g.cover(P.marigold, shrink * .9);
-      g.sprite('sparkle', { x: CX, y: 700, h: 3000 * shrink, anchor: 'center' });
-    }
 
     const i = Math.min(C.EVENTS.length - 1, Math.floor(t / each));
     const tb = t - i * each;
     const ev = C.EVENTS[i];
     const cast = C.CAST.celebrations[i];
     const last = i === C.EVENTS.length - 1;
+
+    /* the sparkle from the proposal collapses away. The sangeet card paints
+       its own field, so it goes down first and the collapse plays over it. */
+    const shrink = 1 - ease.out(pl(t, 0, .7));
+    const collapse = () => {
+      if (shrink <= 0) return;
+      g.cover(P.marigold, shrink * .9);
+      g.sprite('sparkle', { x: CX, y: 700, h: 3000 * shrink, anchor: 'center' });
+    };
+
+    if (i === 0) { sangeetCard(g, tb, ev); collapse(); return; }
+    if (i === 1) {
+      weddingCard(g, tb, ev);
+      /* the same cream flash that marks every change of event */
+      if (tb < .22) g.cover(P.paper, (1 - tb / .22) * .55);
+      return;
+    }
+    if (i === 2) {
+      receptionCard(g, tb, ev);
+      /* the same cream flash that marks every change of event */
+      if (tb < .22) g.cover(P.paper, (1 - tb / .22) * .55);
+      return;
+    }
+    collapse();
 
     /* a cream flash on each change of event */
     if (i > 0 && tb < .22) g.cover(P.paper, (1 - tb / .22) * .55);
@@ -1515,7 +2096,9 @@ const SCENES = (() => {
     { id: 'together', dur: S.together, draw: together },
     { id: 'lifeHappened', dur: S.lifeHappened, draw: lifeHappened },
     { id: 'oneDay', dur: S.oneDay, draw: oneDay },
-    { id: 'paris', dur: S.paris, draw: paris },
+    /* gates: local times where the clock holds for the drag gesture — see
+       the director in main.js. Only this scene has them. */
+    { id: 'paris', dur: S.paris, draw: paris, gates: PA_GATES },
     { id: 'celebrations', dur: S.celebrations, draw: celebrations },
   ];
 })();
