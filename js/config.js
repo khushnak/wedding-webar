@@ -26,9 +26,9 @@ const CONFIG = {
   EVENTS: [
     {
       name: 'SANGEET',
-      venue: 'The Grand Mirage, Pune',
+      venue: 'DELHI',
       date: '14 February 2027',
-      time: '7:00 pm onwards',
+      time: '7 AM ONWARDS',
     },
     {
       name: 'WEDDING',
@@ -61,18 +61,38 @@ const CONFIG = {
     /* Each of these is its own content length plus a small tail — they
        are trimmed to match, because a scene that keeps running after its
        last beat is what makes an instant cut feel like a slow fade. */
-    meetRahul: 13.15,
+    meetRahul: 12.35,
     meetArya: 6.4,
-    college: 9.25,
+    /* BAM lands at 5.30 and is gone by 5.65; this used to run to 8.60,
+       leaving ~3s of motionless campus after the collision before the cut.
+       Scene 3 opens on the same static campus, so the cut is invisible and
+       the dead time simply goes. */
+    college: 6.2,
     together: 9.2,
-    lifeHappened: 9.3,
-    oneDay: 8,
-    paris: 24.6,
+    lifeHappened: 8.3,
+    /* Ends the instant the travel line clears the frame — the exit is a
+       transition, not a beat, so there is no tail after it. */
+    oneDay: 6.65,
+    paris: 18.7,
     celebrations: 24,
   },
 
+  /* Seconds the card can be out of frame before the story resets. */
+ 
   /* Pause at the end before the film loops. */
   LOOP_GAP: 1.6,
+
+  /* --------------------------------------------------------------- audio */
+  /* One track, for the celebrations only — sangeet, wedding and reception
+     are three cards of a single sequence, so they share a single soundtrack
+     that runs from the first frame of SANGEET to the last frame of
+     RECEPTION and never restarts in between. Scenes 1-6 are silent.
+     Keep the volume in the 0.35-0.45 range: this is background music under
+     a film with no dialogue, not the thing being listened to. */
+  AUDIO: {
+    celebrations: 'assets/audio/celebrations.mp3',
+    volume: 0.38,
+  },
 
   /* --------------------------------------------------------------- stage */
   /* Landscape, matching the native pixel size of the Scene 1 garden art
@@ -253,6 +273,29 @@ const CONFIG = {
     aryaWedWave: 'characters/arya_wed_wave.png',
     aryaWedBlush: 'characters/arya_wed_blush.png',
     aryaWedPoint: 'characters/arya_wed_point.png',
+
+    /* Scene 7, sangeet — two alternate poses of the couple dancing, plus the
+       two hanging decorations that frame the card. The disco ball's own
+       sparkles are painted into its PNG; the twinkles scenes.js adds are
+       drawn on top with canvas primitives, never by animating the art. */
+    sangeet1: 'characters/sangeet_1.png',
+    sangeet2: 'characters/sangeet_2.png',
+    lights: 'icons/lights.png',
+    discoball: 'icons/discoball.png',
+
+    /* Scene 7, wedding — the varmala, two alternate poses, and the two
+       hanging decorations that frame it left and right. */
+    wedding1: 'characters/wedding_1.png',
+    wedding2: 'characters/wedding_2.png',
+    garlands: 'icons/garlands.png',
+    umbrella: 'icons/umbrella.png',
+
+    /* Scene 7, reception — two alternate poses plus the hanging strings
+       and chandelier that frame them left and right. */
+    reception1: 'characters/reception_1.png',
+    reception2: 'characters/reception_2.png',
+    strings: 'icons/strings.png',
+    chandelier: 'icons/chandeliar.png',
 
     coupleSangeet: 'characters/couple_sangeet.png',
     coupleReception: 'characters/couple_reception.png',
