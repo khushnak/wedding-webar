@@ -203,56 +203,56 @@ const CONFIG = {
   /* key: filename under assets/. Swap a file and the whole film updates.   */
   ASSETS: {
     /* Scene 1 environment layers (parallax, all same frame, stacked). */
-    gardenBg: 'background/garden_background.png',
-    gardenMid: 'background/garden_midground.png',
-    gardenFg: 'background/garden_foreground.png',
+    gardenBg: 'background/garden_background.webp',
+    gardenMid: 'background/garden_midground.webp',
+    gardenFg: 'background/garden_foreground.webp',
 
     /* Scene 2 environment layers — same three-layer structure as Scene 1:
        collegeBg is the whole opaque campus, collegeMid/collegeFg are
        transparent corner vignettes that frame it. */
-    collegeBg: 'background/college_background.png',
-    collegeMid: 'background/college_midground.png',
-    collegeFg: 'background/college_foreground.png',
+    collegeBg: 'background/college_background.webp',
+    collegeMid: 'background/college_midground.webp',
+    collegeFg: 'background/college_foreground.webp',
 
     /* Scene 2 characters. The 'pose'/'intro' art is how they walk in; the
        'college' art is the startled face they swap to on the bump. */
-    rahulCollege: 'characters/rahul_college.png',
-    aryaCollege: 'characters/arya_college.png',
+    rahulCollege: 'characters/rahul_college.webp',
+    aryaCollege: 'characters/arya_college.webp',
 
     /* Scene 1's settled pose, swapped in on the introduction text beat. */
-    rahulPose: 'characters/rahul_pose.png',
-    aryaPose: 'characters/arya_pose.png',
+    rahulPose: 'characters/rahul_pose.webp',
+    aryaPose: 'characters/arya_pose.webp',
 
     /* Scene 2 impact graphic — the only BAM artwork in the film. */
-    bam: 'icons/bam.png',
+    bam: 'icons/bam.webp',
 
     /* Scene 3's four story beats. 'phone'/'heart' are the real filenames
        on disk; the older 'phones' key below points at a file that is not
        in the project. */
-    phone: 'icons/phone.png',
-    heart: 'icons/heart.png',
+    phone: 'icons/phone.webp',
+    heart: 'icons/heart.webp',
 
     /* Scene 4 — the forked path. */
-    roadBg: 'background/road_background.png',
-    roadFg: 'background/road_foreground.png',
+    roadBg: 'background/road_background.webp',
+    roadFg: 'background/road_foreground.webp',
 
     /* oneDay — the two-airplane flight to France, behind the planes and
        their trails. Replaces what was a plain OD_BACKDROP colour fill. */
-    vacationBg: 'background/vacation_background.png',
+    vacationBg: 'background/vacation_background.webp',
 
     /* Scene 6 — the airport, same three-layer structure as the garden and
        the campus: an opaque interior plus two corner vignettes. */
-    airportBg: 'background/airport_background.png',
-    airportMid: 'background/airport_midground.png',
-    airportFg: 'background/airport_foreground.png',
-    rahulAirport: 'characters/rahul_airport.png',
-    aryaAirport: 'characters/arya_airport.png',
+    airportBg: 'background/airport_background.webp',
+    airportMid: 'background/airport_midground.webp',
+    airportFg: 'background/airport_foreground.webp',
+    rahulAirport: 'characters/rahul_airport.webp',
+    aryaAirport: 'characters/arya_airport.webp',
     /* how they arrive, before the reunion pose swap, and what they wheel
        in with */
-    rahulFrance: 'characters/rahul_france.png',
-    aryaFrance: 'characters/arya_france.png',
-    rahulSuitcase: 'icons/rahul_suitcase.png',
-    aryaSuitcase: 'icons/arya_suitcase.png',
+    rahulFrance: 'characters/rahul_france.webp',
+    aryaFrance: 'characters/arya_france.webp',
+    rahulSuitcase: 'icons/rahul_suitcase.webp',
+    aryaSuitcase: 'icons/arya_suitcase.webp',
 
     /* Scene 6's later stops — the world changes around the couple while
        they stay put. Same three-layer structure throughout. */
@@ -260,111 +260,111 @@ const CONFIG = {
        files, and the river's "foreground" IS the boat the couple ride in.
        They are also 1536x1024 / 2172x724 rather than the stage's 1672x941,
        so scenes.js fits them to width instead of stretching them to frame. */
-    riverBg: 'background/river_background.png',
-    riverFg: 'background/river_foreground.png',
-    louvreBg: 'background/louvre_background.png',
-    louvreFg: 'background/louvre_foreground.png',
-    eiffelBg: 'background/eiffel_background.png',
-    eiffelFg: 'background/eiffel_foreground.png',
-    rahulBigHappy: 'characters/rahul_big_happy.png',
-    aryaBigHappy: 'characters/arya_big_happy.png',
-    rahulPropose: 'characters/rahul_propose.png',
+    riverBg: 'background/river_background.webp',
+    riverFg: 'background/river_foreground.webp',
+    louvreBg: 'background/louvre_background.webp',
+    louvreFg: 'background/louvre_foreground.webp',
+    eiffelBg: 'background/eiffel_background.webp',
+    eiffelFg: 'background/eiffel_foreground.webp',
+    rahulBigHappy: 'characters/rahul_big_happy.webp',
+    aryaBigHappy: 'characters/arya_big_happy.webp',
+    rahulPropose: 'characters/rahul_propose.webp',
     /* The Louvre stop only — see the isLouvre check in paris() in scenes.js. */
-    rahulLouvre: 'characters/rahul_louvre.png',
-    aryaLouvre: 'characters/arya_louvre.png',
+    rahulLouvre: 'characters/rahul_louvre.webp',
+    aryaLouvre: 'characters/arya_louvre.webp',
     /* The Seine/river-boat stop only — see the isSeine check in paris(). */
-    rahulRiver: 'characters/rahul_river.png',
-    aryaRiver: 'characters/arya_river.png',
+    rahulRiver: 'characters/rahul_river.webp',
+    aryaRiver: 'characters/arya_river.webp',
 
     /* Scene 1 character art — distinct from the generic 'rahul'/'arya' poses
        below, which the later scenes (college onward) still use unchanged. */
-    rahulIntro: 'characters/rahul_intro.png',
-    aryaIntro: 'characters/arya_intro.png',
+    rahulIntro: 'characters/rahul_intro.webp',
+    aryaIntro: 'characters/arya_intro.webp',
     /* meetRahul/meetArya's own 3-stage pose swap only (hops -> settled ->
        tags gone) — see the pose ternaries in those two scene functions. */
-    rahulIntro1: 'characters/rahul_intro1.png',
-    rahulIntro2: 'characters/rahul_intro2.png',
-    rahulIntro3: 'characters/rahul_intro3.png',
-    aryaIntro1: 'characters/arya_intro1.png',
-    aryaIntro2: 'characters/arya_intro2.png',
-    aryaIntro3: 'characters/arya_intro3.png',
+    rahulIntro1: 'characters/rahul_intro1.webp',
+    rahulIntro2: 'characters/rahul_intro2.webp',
+    rahulIntro3: 'characters/rahul_intro3.webp',
+    aryaIntro1: 'characters/arya_intro1.webp',
+    aryaIntro2: 'characters/arya_intro2.webp',
+    aryaIntro3: 'characters/arya_intro3.webp',
     /* lifeHappened's fork-road reveal only — see the sprite calls there. */
-    rahulMasters: 'characters/rahul_masters.png',
-    aryaMasters: 'characters/arya_masters.png',
+    rahulMasters: 'characters/rahul_masters.webp',
+    aryaMasters: 'characters/arya_masters.webp',
     /* Discrete pose swap the moment each name's title text appears — no
        crossfade, a stop-motion pose change. */
-    rahulHappy: 'characters/rahul_happy.png',
-    aryaHappy: 'characters/arya_happy.png',
+    rahulHappy: 'characters/rahul_happy.webp',
+    aryaHappy: 'characters/arya_happy.webp',
 
     /* Scene 1's standalone airplane — separate from the bubble that pops to
        release it, and separate from the unrelated 'airplane' icon below
        (which oneDay/paris still use for their own two-plane sequence). */
-    travelAirplane: 'icons/travel_airplane.png',
+    travelAirplane: 'icons/travel_airplane.webp',
 
-    rahul: 'characters/rahul_casual.png',
-    arya: 'characters/arya_casual.png',
+    rahul: 'characters/rahul_casual.webp',
+    arya: 'characters/arya_casual.webp',
 
-    rahulWed: 'characters/rahul_wed_turban.png',
-    rahulWedCheer: 'characters/rahul_wed_cheer.png',
-    rahulWedDance: 'characters/rahul_wed_dance.png',
-    rahulWedIdle: 'characters/rahul_wed_idle.png',
-    aryaWed: 'characters/arya_wed_namaste.png',
-    aryaWedWave: 'characters/arya_wed_wave.png',
-    aryaWedBlush: 'characters/arya_wed_blush.png',
-    aryaWedPoint: 'characters/arya_wed_point.png',
+    rahulWed: 'characters/rahul_wed_turban.webp',
+    rahulWedCheer: 'characters/rahul_wed_cheer.webp',
+    rahulWedDance: 'characters/rahul_wed_dance.webp',
+    rahulWedIdle: 'characters/rahul_wed_idle.webp',
+    aryaWed: 'characters/arya_wed_namaste.webp',
+    aryaWedWave: 'characters/arya_wed_wave.webp',
+    aryaWedBlush: 'characters/arya_wed_blush.webp',
+    aryaWedPoint: 'characters/arya_wed_point.webp',
 
     /* Scene 7, sangeet — two alternate poses of the couple dancing, plus the
        two hanging decorations that frame the card. The disco ball's own
        sparkles are painted into its PNG; the twinkles scenes.js adds are
        drawn on top with canvas primitives, never by animating the art. */
-    sangeet1: 'characters/sangeet_1.png',
-    sangeet2: 'characters/sangeet_2.png',
-    lights: 'icons/lights.png',
-    discoball: 'icons/discoball.png',
+    sangeet1: 'characters/sangeet_1.webp',
+    sangeet2: 'characters/sangeet_2.webp',
+    lights: 'icons/lights.webp',
+    discoball: 'icons/discoball.webp',
 
     /* Scene 7, wedding — the varmala, two alternate poses, and the two
        hanging decorations that frame it left and right. */
-    wedding1: 'characters/wedding_1.png',
-    wedding2: 'characters/wedding_2.png',
-    garlands: 'icons/garlands.png',
-    umbrella: 'icons/umbrella.png',
+    wedding1: 'characters/wedding_1.webp',
+    wedding2: 'characters/wedding_2.webp',
+    garlands: 'icons/garlands.webp',
+    umbrella: 'icons/umbrella.webp',
 
     /* Scene 7, reception — two alternate poses plus the hanging strings
        and chandelier that frame them left and right. */
-    reception1: 'characters/reception_1.png',
-    reception2: 'characters/reception_2.png',
-    strings: 'icons/strings.png',
-    chandelier: 'icons/chandeliar.png',
+    reception1: 'characters/reception_1.webp',
+    reception2: 'characters/reception_2.webp',
+    strings: 'icons/strings.webp',
+    chandelier: 'icons/chandeliar.webp',
 
-    coupleSangeet: 'characters/couple_sangeet.png',
-    coupleReception: 'characters/couple_reception.png',
+    coupleSangeet: 'characters/couple_sangeet.webp',
+    coupleReception: 'characters/couple_reception.webp',
 
-    flowers: 'icons/flowers.png',
-    butterflies: 'icons/butterflies.png',
-    chai: 'icons/chai.png',
-    food: 'icons/food.png',
-    phones: 'icons/phones.png',
-    airplane: 'icons/airplane.png',
-    suitcases: 'icons/suitcases.png',
-    franceFlag: 'icons/france_flag.png',
-    eiffel: 'icons/eiffel.png',
-    louvre: 'icons/louvre.png',
-    seine: 'icons/seine.png',
-    ring: 'icons/ring.png',
-    sparkle: 'icons/sparkle.png',
-    college: 'icons/college.png',
-    road: 'icons/road.png',
-    airport: 'icons/airport.png',
+    flowers: 'icons/flowers.webp',
+    butterflies: 'icons/butterflies.webp',
+    chai: 'icons/chai.webp',
+    food: 'icons/food.webp',
+    phones: 'icons/phones.webp',
+    airplane: 'icons/airplane.webp',
+    suitcases: 'icons/suitcases.webp',
+    franceFlag: 'icons/france_flag.webp',
+    eiffel: 'icons/eiffel.webp',
+    louvre: 'icons/louvre.webp',
+    seine: 'icons/seine.webp',
+    ring: 'icons/ring.webp',
+    sparkle: 'icons/sparkle.webp',
+    college: 'icons/college.webp',
+    road: 'icons/road.webp',
+    airport: 'icons/airport.webp',
 
     /* Scene 1 hobby badges. */
-    cricket: 'icons/cricket.png',
-    travel: 'icons/travel.png',
-    music: 'icons/music.png',
-    photography: 'icons/photography.png',
-    painting: 'icons/painting.png',
-    dancing: 'icons/dancing.png',
-    hiking: 'icons/hiking.png',
-    baking: 'icons/baking.png',
+    cricket: 'icons/cricket.webp',
+    travel: 'icons/travel.webp',
+    music: 'icons/music.webp',
+    photography: 'icons/photography.webp',
+    painting: 'icons/painting.webp',
+    dancing: 'icons/dancing.webp',
+    hiking: 'icons/hiking.webp',
+    baking: 'icons/baking.webp',
   },
 
   /* --------------------------------------------------------------- cast */
