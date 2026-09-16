@@ -1058,7 +1058,7 @@ const SCENES = (() => {
         if (!pose) return;
         g.text(w, {
           x: CX, y: 330 + i * 190, size: 175, font: 'title',
-          color: '#ffffff', scale: pose.scale, rot: pose.rot, outline: 0,
+          color: P.ink, scale: pose.scale, rot: pose.rot, outline: 0,
         });
       });
     }
@@ -1124,14 +1124,14 @@ const SCENES = (() => {
       const big = lifePunch(t - OD_TITLE_T0);
       if (big) {
         g.text('ONE DAY', {
-          x: CX, y: 475, size: 230, font: 'title', color: '#ffffff',
+          x: CX, y: 475, size: 230, font: 'title', color: P.chilli,
           scale: big.scale, rot: big.rot, outline: 0,
         });
       }
       const small = lifePunch(t - OD_SUB_T0);
       if (small) {
         g.text('ON VACATION', {
-          x: CX, y: 615, size: 110, font: 'title', color: '#ffffff',
+          x: CX, y: 615, size: 110, font: 'title', color: P.ink,
           scale: small.scale, rot: small.rot, outline: 0,
         });
       }
