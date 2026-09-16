@@ -47,7 +47,7 @@ const CONFIG = {
   /* Scene 4 destination cards */
   SPLIT: {
     left: { big: 'DUBAI', small: 'work' },
-    right: { big: 'MASTERS', small: 'study' },
+    right: { big: 'INDIA', small: 'study' },
   },
 
   /* ------------------------------------------------------------- timings */
@@ -106,6 +106,10 @@ const CONFIG = {
   AUDIO: {
     celebrations: 'assets/audio/celebrations.mp3',
     volume: 0.38,
+    /* Plays once, the instant the viewer taps to start the story (see
+       onTap in main.js) — independent of the celebrations track above. */
+    start: 'assets/audio/start.mp3',
+    startVolume: 0.7,
   },
 
   /* --------------------------------------------------------------- stage */
@@ -157,7 +161,7 @@ const CONFIG = {
   LAYERS: {
     order: ['background', 'midground', 'characters', 'foreground'],
     keys: {
-      background: ['gardenBg', 'collegeBg', 'airportBg', 'riverBg', 'louvreBg', 'eiffelBg'],
+      background: ['gardenBg', 'collegeBg', 'airportBg', 'riverBg', 'louvreBg', 'eiffelBg', 'vacationBg', 'roadBg'],
       midground: ['gardenMid', 'collegeMid', 'airportMid'],
       foreground: ['gardenFg', 'collegeFg', 'airportFg', 'riverFg', 'louvreFg', 'eiffelFg', 'roadFg'],
     },
@@ -228,9 +232,13 @@ const CONFIG = {
     phone: 'icons/phone.png',
     heart: 'icons/heart.png',
 
-    /* Scene 4 — the forked path. Scene 4 uses a flat backdrop rather
-       than an illustrated one, so road_background.png is not loaded. */
+    /* Scene 4 — the forked path. */
+    roadBg: 'background/road_background.png',
     roadFg: 'background/road_foreground.png',
+
+    /* oneDay — the two-airplane flight to France, behind the planes and
+       their trails. Replaces what was a plain OD_BACKDROP colour fill. */
+    vacationBg: 'background/vacation_background.png',
 
     /* Scene 6 — the airport, same three-layer structure as the garden and
        the campus: an opaque interior plus two corner vignettes. */
@@ -261,11 +269,28 @@ const CONFIG = {
     rahulBigHappy: 'characters/rahul_big_happy.png',
     aryaBigHappy: 'characters/arya_big_happy.png',
     rahulPropose: 'characters/rahul_propose.png',
+    /* The Louvre stop only — see the isLouvre check in paris() in scenes.js. */
+    rahulLouvre: 'characters/rahul_louvre.png',
+    aryaLouvre: 'characters/arya_louvre.png',
+    /* The Seine/river-boat stop only — see the isSeine check in paris(). */
+    rahulRiver: 'characters/rahul_river.png',
+    aryaRiver: 'characters/arya_river.png',
 
     /* Scene 1 character art — distinct from the generic 'rahul'/'arya' poses
        below, which the later scenes (college onward) still use unchanged. */
     rahulIntro: 'characters/rahul_intro.png',
     aryaIntro: 'characters/arya_intro.png',
+    /* meetRahul/meetArya's own 3-stage pose swap only (hops -> settled ->
+       tags gone) — see the pose ternaries in those two scene functions. */
+    rahulIntro1: 'characters/rahul_intro1.png',
+    rahulIntro2: 'characters/rahul_intro2.png',
+    rahulIntro3: 'characters/rahul_intro3.png',
+    aryaIntro1: 'characters/arya_intro1.png',
+    aryaIntro2: 'characters/arya_intro2.png',
+    aryaIntro3: 'characters/arya_intro3.png',
+    /* lifeHappened's fork-road reveal only — see the sprite calls there. */
+    rahulMasters: 'characters/rahul_masters.png',
+    aryaMasters: 'characters/arya_masters.png',
     /* Discrete pose swap the moment each name's title text appears — no
        crossfade, a stop-motion pose change. */
     rahulHappy: 'characters/rahul_happy.png',

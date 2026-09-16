@@ -401,7 +401,15 @@ const SCENES = (() => {
     g.ctx.save();
     g.ctx.translate(-cam, 0);
     const slide = slideIn(t, RAHUL_ENTER_T0, CUTOUT_HOLD, -180 * SX, RAHUL_X);
-    const pose = t < RAHUL_TITLE_T0 ? 'rahulIntro' : 'rahulPose';  // instant stop-motion pose swap, no crossfade
+    /* Three stop-motion pose swaps, no crossfade: intro1 through the 3 hops
+       (off-screen -> RAHUL_SETTLE_T0, the CUTOUT_POSES journey), intro2 once
+       he's settled at the point, then intro3 once both trait tags are fully
+       gone. RAHUL_TAG2_T0 is the later of the two tags, and +1.5 is that
+       tag()'s own life() duration above — the exact instant it finishes
+       fading out. */
+    const RAHUL_TAGS_GONE_T0 = RAHUL_TAG2_T0 + 1.5;
+    const pose = t < RAHUL_SETTLE_T0 ? 'rahulIntro1'
+      : t < RAHUL_TAGS_GONE_T0 ? 'rahulIntro2' : 'rahulIntro3';
 
     g.shadow(slide.x, GY + 6 * SY, 90 * SY, 1);
     g.sprite(pose, { x: slide.x, y: GY, h: CHAR_H, rot: slide.rot });
@@ -592,7 +600,13 @@ const SCENES = (() => {
        slideIn / CUTOUT_POSES) — holding fully static in between and
        forever after — starting only after the brief quiet beat above. */
     const slide = slideIn(t, ARYA_ENTER_T0, ARYA_HOLD, 1190 * SX, ARYA_X);
-    const pose = t < ARYA_TITLE_T0 ? 'aryaIntro' : 'aryaPose';  // instant stop-motion pose swap, no crossfade
+    /* Same three-stage swap as Rahul: intro1 through her 3 hops (up to
+       ARYA_SETTLE_T0), intro2 once she's settled, then intro3 once both
+       trait tags are fully gone — ARYA_TAG2_T0 (the later tag) + 1.5, that
+       tag()'s own life() duration above. */
+    const ARYA_TAGS_GONE_T0 = ARYA_TAG2_T0 + 1.5;
+    const pose = t < ARYA_SETTLE_T0 ? 'aryaIntro1'
+      : t < ARYA_TAGS_GONE_T0 ? 'aryaIntro2' : 'aryaIntro3';
 
     g.shadow(slide.x, GY + 6 * SY, 92 * SY, 1);
     g.sprite(pose, { x: slide.x, y: GY, h: CHAR_H, flip: true, rot: slide.rot });
@@ -983,13 +997,15 @@ const SCENES = (() => {
   function lifeHappened(g, t) {
     const bgW = C.STAGE.logicalW, bgH = C.STAGE.logicalH;
 
-    /* Flat backdrop, painted full-frame and NOT slid, so the exit below can
-       never expose a bare edge. */
+    /* Backdrop, painted full-frame and NOT slid, so the exit below can never
+       expose a bare edge. LF_BACKDROP stays underneath as a backstop in case
+       roadBg is ever missing, same pattern as the other scenes' sky fills. */
     if (g.on('background')) {
       g.ctx.save();
       g.ctx.fillStyle = LF_BACKDROP;
       g.ctx.fillRect(0, 0, bgW, bgH);
       g.ctx.restore();
+      g.sprite('roadBg', { x: CX, y: bgH / 2, w: bgW, h: bgH, anchor: 'center' });
     }
 
     /* Everything else rides one transform, so the exit is a single physical
@@ -1027,8 +1043,13 @@ const SCENES = (() => {
 
       g.shadow(rs.x, y + 6 * SY, h * .16, 1);
       g.shadow(as.x, y + 6 * SY, h * .16, 1);
-      g.sprite('rahulIntro', { x: rs.x, y, h, rot: rs.rot });
-      g.sprite('aryaIntro', { x: as.x, y, h, rot: as.rot });
+      /* Fixed replacement art for this beat only — rahulIntro/aryaIntro are
+         shared with meetRahul, meetArya, college and together, so those
+         keys stay untouched; only this call site (the fork-road reveal)
+         uses the dedicated masters art. Same x/y/h/rot as before, so
+         position, scale and the ground-plane anchor are unchanged. */
+      g.sprite('rahulMasters', { x: rs.x, y, h, rot: rs.rot });
+      g.sprite('aryaMasters', { x: as.x, y, h, rot: as.rot });
     }
 
     /* Where each road goes — stamped on with the same punch as the title,
@@ -1041,11 +1062,11 @@ const SCENES = (() => {
       const pose = lifePunch(t - (LF_LABEL_T0 + i * .18));
       if (!pose) return;
       g.text(l.side.big, {
-        x: l.x, y: 300, size: 92 * SY, font: 'handwriting', color: P.paper,
+        x: l.x, y: 300, size: 92 * SY, font: 'title', color: P.navy,
         scale: pose.scale, rot: pose.rot, outline: 0,
       });
       g.text(l.side.small, {
-        x: l.x, y: 372, size: 70 * SY, font: 'handwriting', color: P.marigold,
+        x: l.x, y: 320, size: 70 * SY, font: 'handwriting', color: P.paper,
         scale: pose.scale, rot: pose.rot, outline: 0,
       });
     });
@@ -1058,7 +1079,7 @@ const SCENES = (() => {
         if (!pose) return;
         g.text(w, {
           x: CX, y: 330 + i * 190, size: 175, font: 'title',
-          color: P.marigold, scale: pose.scale, rot: pose.rot, outline: 0,
+          color: P.navy, scale: pose.scale, rot: pose.rot, outline: 0,
         });
       });
     }
@@ -1111,10 +1132,20 @@ const SCENES = (() => {
     const bgW = C.STAGE.logicalW, bgH = C.STAGE.logicalH;
 
     if (g.on('background')) {
+      /* OD_BACKDROP stays as a backstop beneath the image — invisible unless
+         vacation_background.png is ever missing, exactly like the sky fills
+         elsewhere in this file. The image is fit by height only (not
+         w+h together, which would stretch it to the stage's own 1672x941
+         ratio): at its native ~2.10:1 it is wider than the stage's 1.78:1,
+         so filling the height and letting the excess width run past the
+         edges — sprite() centres it on CX — covers the frame edge to edge
+         with no distortion, at the cost of a small, even crop on both
+         sides rather than any stretching. */
       g.ctx.save();
       g.ctx.fillStyle = OD_BACKDROP;
       g.ctx.fillRect(0, 0, bgW, bgH);
       g.ctx.restore();
+      g.sprite('vacationBg', { x: CX, y: bgH / 2, h: bgH, anchor: 'center' });
     }
 
     /* Title card: both lines Modak, stamped on with the same discrete punch
@@ -1365,14 +1396,14 @@ const SCENES = (() => {
     /* fgScale/fgDx/fgDy pull the boat back and over to one side without
        touching the river behind it:
        the background is drawn exactly as before, only the boat shrinks and
-       drops, so more of the Seine shows around it. The couple and the cases
-       are authored in the boat's original space and carried through the
-       same transform, so they stay standing in it. */
+       drops, so more of the Seine shows around it. The couple are authored
+       in the boat's original space and carried through the same transform,
+       so they stay standing in it. */
     { t0: PA_SEINE_T0, bg: 'riverBg', fg: 'riverFg', front: true,
       fgScale: .68, fgDx: 250, fgDy: 130, charK: 1.36,
-      rx: 680, ax: 996, feet: 697, cases: true, caseY: 697, caseDX: 165, caseH: 250 },
+      rx: 680, ax: 996, feet: 697, cases: false },
     { t0: PA_LOUVRE_T0, bg: 'louvreBg', fg: 'louvreFg', front: true,
-      rx: 700, ax: 980, feet: 850, cases: true, caseY: 850, caseDX: 196, caseH: 235 },
+      rx: 700, ax: 980, feet: 850, cases: false },
     { t0: PA_EIFFEL_T0, bg: 'eiffelBg', fg: 'eiffelFg',
       rx: 700, ax: 980, feet: 880, cases: false },
   ];
@@ -1528,8 +1559,16 @@ const SCENES = (() => {
           g.sprite('rahulSuitcase', { x: f.x(stop.rx - stop.caseDX), y: f.y(stop.caseY), h: stop.caseH * ck });
           g.sprite('aryaSuitcase', { x: f.x(stop.ax + stop.caseDX), y: f.y(stop.caseY), h: stop.caseH * ck });
         }
-        g.sprite(paRahulPose(t), { x: f.x(stop.rx), y: f.y(stop.feet), h: CHAR_H * ck });
-        g.sprite(paAryaPose(t), { x: f.x(stop.ax), y: f.y(stop.feet), h: CHAR_H * ck });
+        /* The Seine and the Louvre only: fixed replacement art instead of
+           the shared paRahulPose/paAryaPose swap (which also drives the
+           Eiffel and must stay untouched there). Same call, same x/y/h —
+           only the asset key differs — so position, scale (including the
+           Seine's own charK above) and the feet-on-ground anchor are
+           exactly what they were. */
+        const isLouvre = stop.bg === 'louvreBg';
+        const isSeine = stop.bg === 'riverBg';
+        g.sprite(isLouvre ? 'rahulLouvre' : isSeine ? 'rahulRiver' : paRahulPose(t), { x: f.x(stop.rx), y: f.y(stop.feet), h: CHAR_H * ck });
+        g.sprite(isLouvre ? 'aryaLouvre' : isSeine ? 'aryaRiver' : paAryaPose(t), { x: f.x(stop.ax), y: f.y(stop.feet), h: CHAR_H * ck });
       }
     }
 

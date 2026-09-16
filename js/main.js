@@ -65,6 +65,30 @@
     : null;
   if (music && DEBUG) music.log = true;
 
+  /* Plays once, the instant the story actually starts — from onTap() in AR
+     (fired synchronously inside that real click event, which is what lets a
+     browser's autoplay policy allow it) and from startPreview() on desktop.
+     Unlike the Track class above, which starts the celebrations music much
+     later than its own triggering gesture and needs the bless() workaround,
+     this needs no such thing — a direct Audio().play() is enough wherever
+     it's called from a real (or, in preview, load-time) start moment.
+
+     The element is built once, up front, and primed with .load() the same
+     place the music is (see boot()) — building `new Audio()` fresh at tap
+     time meant the browser only started fetching the file at that exact
+     instant, so .play() had to wait out however long that fetch/decode
+     took, which read as the sound lagging behind the animation. */
+  const startSound = (C.AUDIO && C.AUDIO.start) ? new Audio(C.AUDIO.start) : null;
+  if (startSound) {
+    startSound.preload = 'auto';
+    startSound.volume = C.AUDIO.startVolume == null ? 0.7 : C.AUDIO.startVolume;
+  }
+  function playStartSound() {
+    if (!startSound) return;
+    try { startSound.currentTime = 0; } catch (e) { /* not seekable yet */ }
+    startSound.play().catch(() => {});
+  }
+
   /* ----------------------------------------------------------- the gates */
   /* A scene may declare `gates`: local times at which the film waits for the
      viewer to pull the journey forward. The clock stops dead on the gate
@@ -354,6 +378,7 @@
     fit();
 
     director.play();
+    playStartSound();
     initDrag();
     let last = performance.now();
     const loop = now => {
@@ -467,6 +492,7 @@
       if (started || !director.found) return;
       started = true;
       el('hint').hidden = true;
+      playStartSound();
       syncPlaying();
     }
     document.addEventListener('click', onTap);
@@ -607,6 +633,9 @@
        the same percentage for a long time on a phone. The celebrations
        scene it is for is still tens of seconds away from here either way. */
     if (music) music.prime();
+    /* Same reasoning, much smaller file: buffered now so the tap (or, in
+       preview, the load itself) can play it with no fetch delay. */
+    if (startSound && startSound.load) startSound.load();
     director.draw();
 
     if (PREVIEW) return startPreview('requested');
