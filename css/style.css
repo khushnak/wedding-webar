@@ -29,6 +29,14 @@ html, body {
   font-family: 'Baloo 2', 'Trebuchet MS', system-ui, sans-serif;
   -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
+  /* Without this, a real touch drag (unlike a mouse drag on desktop) can be
+     claimed mid-gesture by the browser's own touch handling — edge-swipe
+     back/forward navigation, pull-to-refresh, overscroll bounce — which
+     fires pointercancel and kills the pointermove stream the airport drag
+     in main.js (initDrag) depends on. There is nothing here to scroll or
+     zoom, so disabling every native touch gesture is safe. */
+  touch-action: none;
+  -ms-touch-action: none;
 }
 
 /* Only the root element carries a background colour, and this matters.

@@ -598,8 +598,15 @@
   });
 
   async function boot() {
-    if (music) music.prime();        // buffer it now, not at 67.8s
     await Promise.all([loadImages(), loadFonts()]);
+    /* Buffer the music now, not at 67.8s — but only once the images/fonts
+       gate above has cleared, not before it. This file alone is ~8MB; primed
+       any earlier it competes with ~100MB of artwork for the same mobile
+       connection during the one phase the loading screen is actually
+       tracking, which is a large, needless part of why that screen sits at
+       the same percentage for a long time on a phone. The celebrations
+       scene it is for is still tens of seconds away from here either way. */
+    if (music) music.prime();
     director.draw();
 
     if (PREVIEW) return startPreview('requested');

@@ -82,6 +82,20 @@ const CONFIG = {
   /* Pause at the end before the film loops. */
   LOOP_GAP: 1.6,
 
+  /* ---------------------------------------------------------------- drag */
+  /* The airport gate (see PA_GATES in scenes.js / initDrag in main.js): the
+     one point in the film where the viewer pulls the journey forward
+     instead of it playing on its own. main.js reads every value here —
+     without this block dragThreshold() and the gate's release check throw
+     on the very first frame the clock parks, which freezes the film dead
+     at that gate with no way to move it forward. */
+  DRAG: {
+    thresholdMin: 90,     // px — a full pull never asks for less than this,
+    thresholdMax: 260,    // px — nor more than this, whatever the screen size
+    thresholdFrac: 0.28,  // fraction of the viewport width, clamped by the two above
+    fallback: 6,          // seconds to wait before the journey continues on its own
+  },
+
   /* --------------------------------------------------------------- audio */
   /* One track, for the celebrations only — sangeet, wedding and reception
      are three cards of a single sequence, so they share a single soundtrack
