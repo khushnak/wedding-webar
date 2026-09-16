@@ -59,15 +59,94 @@ def ensure_cert():
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
+    """Static files, plus byte ranges.
+
+    SimpleHTTPRequestHandler answers every request with 200 and the whole
+    file, ignoring Range entirely. Browsers tolerate that for images and
+    scripts, but not for media: Safari (iOS especially) opens an <audio>
+    source with `Range: bytes=0-1`, and a server that replies 200-with-
+    everything instead of `206 Partial Content` is treated as unseekable
+    and the element never plays at all. The audio track is served from
+    here, so this handler answers ranges properly.
+    """
+
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=ROOT, **kw)
 
     def end_headers(self):
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Accept-Ranges", "bytes")
+        if not self._is_media:
+            # JS/HTML stay uncacheable so edits always show up; media does
+            # not, or the phone re-downloads megabytes on every reload.
+            self.send_header("Cache-Control", "no-store")
         super().end_headers()
+
+    @property
+    def _is_media(self):
+        return self.path.split("?")[0].lower().endswith(
+            (".mp3", ".m4a", ".aac", ".ogg", ".wav", ".mp4", ".webm"))
+
+    def send_head(self):
+        rng = self.headers.get("Range")
+        if not rng or not rng.startswith("bytes="):
+            return super().send_head()
+
+        path = self.translate_path(self.path)
+        if os.path.isdir(path) or not os.path.exists(path):
+            return super().send_head()
+
+        size = os.path.getsize(path)
+        spec = rng[len("bytes="):].split(",")[0].strip()
+        first, _, last = spec.partition("-")
+        try:
+            if first:
+                start = int(first)
+                end = int(last) if last else size - 1
+            else:                                  # "bytes=-500" = the tail
+                start = max(0, size - int(last))
+                end = size - 1
+        except ValueError:
+            return super().send_head()
+
+        if start >= size or start > end:
+            self.send_response(416)
+            self.send_header("Content-Range", "bytes */%d" % size)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return None
+
+        end = min(end, size - 1)
+        f = open(path, "rb")
+        f.seek(start)
+        self.send_response(206)
+        self.send_header("Content-type", self.guess_type(path))
+        self.send_header("Content-Range", "bytes %d-%d/%d" % (start, end, size))
+        self.send_header("Content-Length", str(end - start + 1))
+        self.end_headers()
+        return _Slice(f, end - start + 1)
 
     def log_message(self, fmt, *args):
         sys.stderr.write("  %s\n" % (fmt % args))
+
+
+class _Slice:
+    """A read-only window onto an open file, so copyfile() sends only the
+    requested bytes and then stops."""
+
+    def __init__(self, f, length):
+        self.f, self.left = f, length
+
+    def read(self, n=-1):
+        if self.left <= 0:
+            return b""
+        if n is None or n < 0:
+            n = self.left
+        chunk = self.f.read(min(n, self.left))
+        self.left -= len(chunk)
+        return chunk
+
+    def close(self):
+        self.f.close()
 
 
 def main():

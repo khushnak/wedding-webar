@@ -37,6 +37,58 @@
   const TOTAL = SCENES.reduce((a, s) => a + s.dur, 0);
   const RUN = ONLY ? (SCENES.find(s => s.id === ONLY) || {}).dur || TOTAL : TOTAL;
 
+  /* ------------------------------------------------------------- music */
+  /* Sangeet, wedding and reception are three cards of ONE scene, so the
+     music is one window on the story clock rather than three cues: it opens
+     on the first frame of the celebrations scene and closes on its last.
+     Nothing inside that window touches the track, which is what keeps the
+     same playback position running across all three cards.
+
+     The window is derived from the playlist, so re-timing a scene in
+     config.js moves the music with it and nothing here needs editing. Note
+     it is story time, not wall-clock: the paris drag gates stop the clock,
+     and the music waits with it. */
+  const MUSIC_AT = (() => {
+    const i = SCENES.findIndex(s => s.id === 'celebrations');
+    if (i < 0) return null;
+    /* ?scene=celebrations previews the sequence on its own clock; any other
+       single-scene preview is one of the silent scenes. */
+    if (ONLY) return ONLY === 'celebrations' ? { from: 0, to: SCENES[i].dur } : null;
+    const from = SCENES.slice(0, i).reduce((a, s) => a + s.dur, 0);
+    return { from, to: from + SCENES[i].dur };
+  })();
+  /* The film uses only the opening stretch of the file — exactly as many
+     seconds as the celebrations scene is long, so the music can never run on
+     past the picture even if the mp3 is minutes longer (this one is 346s). */
+  const music = (MUSIC_AT && C.AUDIO && C.AUDIO.celebrations)
+    ? new E.Track(C.AUDIO.celebrations, C.AUDIO.volume, MUSIC_AT.to - MUSIC_AT.from)
+    : null;
+  if (music && DEBUG) music.log = true;
+
+  /* ----------------------------------------------------------- the gates */
+  /* A scene may declare `gates`: local times at which the film waits for the
+     viewer to pull the journey forward. The clock stops dead on the gate
+     frame, so every scene stays exactly the pure draw(stage, t) function it
+     was — the gate changes when t advances, never what t means. */
+  function buildGates() {
+    const out = [];
+    if (ONLY) {
+      const s = SCENES.find(x => x.id === ONLY);
+      if (s && s.gates) s.gates.forEach(lt => out.push({ at: lt, done: false }));
+      return out;
+    }
+    let acc = 0;
+    for (const s of SCENES) {
+      if (s.gates) s.gates.forEach(lt => out.push({ at: acc + lt, done: false }));
+      acc += s.dur;
+    }
+    return out;
+  }
+  const GATES = buildGates();
+  const dragThreshold = () =>
+    Math.max(C.DRAG.thresholdMin,
+      Math.min(C.DRAG.thresholdMax, innerWidth * C.DRAG.thresholdFrac));
+
   /* ------------------------------------------------------------- loading */
 
   function loadImages() {
@@ -78,8 +130,32 @@
     playing: PREVIEW,      // preview starts immediately; AR waits for the card
     lostFor: 0,
     lastDraw: -1,
+    drag: 0,               // 0..1 while a gate is open, for the scene to read
+    held: false,           // is the clock currently waiting on a gesture?
+    waited: 0,
 
-    reset() { this.time = START_AT; this.lastDraw = -1; },
+    reset() {
+      this.time = START_AT;
+      this.lastDraw = -1;
+      this.clearGates();
+      if (music) music.stop();       // a restarted film restarts silent
+    },
+
+    /* Called once per frame, alongside advance(). It only reports where the
+       clock is; Track decides whether that means starting, continuing or
+       stopping, so play() is never issued from a drawing path. */
+    syncMusic() {
+      if (!music) return;
+      const inside = this.time >= MUSIC_AT.from && this.time < MUSIC_AT.to;
+      music.update(inside, this.playing);
+    },
+
+    clearGates() {
+      GATES.forEach(x => { x.done = false; });
+      this.held = false; this.waited = 0; this.drag = 0;
+    },
+
+    openGate() { return GATES.find(x => !x.done) || null; },
 
     play() { this.playing = true; this.lostFor = 0; },
 
@@ -88,23 +164,50 @@
     /* dt in seconds */
     advance(dt) {
       if (!this.playing) return;
+
+      const gate = this.openGate();
+      if (gate && this.time + dt >= gate.at) {
+        /* land exactly on the gate frame and hold there */
+        this.time = gate.at;
+        this.held = true;
+        this.waited += dt;
+        /* released by the gesture, or by the fallback so the story never
+           dead-ends for someone who does not find it */
+        if (this.drag >= 1 || this.waited >= C.DRAG.fallback) {
+          gate.done = true;
+          this.held = false;
+          this.waited = 0;
+          this.drag = 0;
+        }
+        return;
+      }
+
+      this.held = false;
       this.time += dt;
       if (this.time > RUN + C.LOOP_GAP) {
         this.time = 0;
         this.lastDraw = -1;      // the frame clock wrapped too
+        this.clearGates();
       }
     },
 
     draw() {
       const minStep = 1 / C.STAGE.fpsCap;
       const since = this.time - this.lastDraw;
-      if (this.lastDraw >= 0 && since >= 0 && since < minStep) return false;
+      /* while a gate holds, `time` stops changing but the drag response must
+         still repaint, so the frame-rate gate is skipped */
+      if (!this.held && this.lastDraw >= 0 && since >= 0 && since < minStep) return false;
       this.lastDraw = this.time;
 
       const t = Math.min(this.time, RUN);
 
       /* One pass per diorama panel (just one in preview). */
       for (const st of STAGES) {
+        /* The airport gate's drag position, handed to the scene the same way
+           it always was — but now once per panel. Every pass needs it, not
+           just the panel that paints the plane, because a pass that cannot
+           see g.drag would draw its share of the affordance un-dragged. */
+        st.drag = this.held ? this.drag : 0;
         st.begin();
         if (ONLY) {
           const s = SCENES.find(x => x.id === ONLY);
@@ -124,6 +227,95 @@
       return true;
     },
   };
+
+  /* ------------------------------------------------------ the gesture */
+  /* Pull the journey forward — once, at the airport. The affordance is the
+     plane and its line, so there is no control to hit: while the gate is
+     open the whole frame is the handle, which is the only thing that can
+     work reliably when the picture is a texture on an AR panel rather than
+     a DOM element under the finger.
+
+     Listeners are passive and never call preventDefault, so nothing here
+     touches AR.js's own input or the page's scrolling. */
+  function initDrag() {
+    let startX = 0, startY = 0, active = false, spent = false;
+
+    /* The scene publishes its target as <stage>.hit in stage coordinates,
+       and clears it to null on any pass that is not showing the plane. Now
+       that the film is split across diorama panels the box is published on
+       whichever panel paints the affordance, so take the first panel that
+       has one. In preview there is only ever a single stage, so this is
+       exactly the lookup it has always been. */
+    const hitBox = () => {
+      for (const st of STAGES) if (st.hit) return st.hit;
+      return null;
+    };
+
+    /* Is this pointer on the affordance? In preview the canvas is laid out
+       on screen, so the pointer maps onto it exactly and only the plane, its
+       line and the forgiving patch around them are draggable. Under AR the
+       canvas is parked off-screen (css left:-10000px) and painted onto a
+       THREE panel instead, so no such mapping exists — there the gesture is
+       accepted anywhere, which is the only thing that works reliably and
+       costs nothing, since the gate is open solely while the plane is
+       sitting there waiting. */
+    const onTarget = e => {
+      const hit = hitBox();
+      if (!hit) return false;
+      const r = canvas.getBoundingClientRect();
+      if (!r.width || !r.height || r.right < 0 || r.left > innerWidth) return true;
+      const sx = (e.clientX - r.left) / r.width * C.STAGE.logicalW;
+      const sy = (e.clientY - r.top) / r.height * C.STAGE.logicalH;
+      return sx >= hit.x0 && sx <= hit.x1 && sy >= hit.y0 && sy <= hit.y1;
+    };
+
+    const down = e => {
+      if (!director.held) return;         // only while the journey is waiting
+      if (!onTarget(e)) return;           // and only on the plane itself
+      /* The one gesture in the film, so the one chance to make the music
+         legal. bless() is a silent muted play/pause that buys the browser's
+         permission to start the track from script later; it does not start
+         anything now, and the sangeet is still what begins the music twelve
+         seconds from here. Nothing about the drag itself changes. */
+      if (music) music.bless();
+      active = true;
+      spent = false;
+      startX = e.clientX;
+      startY = e.clientY;
+      director.drag = 0;
+    };
+
+    const move = e => {
+      if (!active || spent) return;
+      /* Forward is RIGHTWARD, matching the way the plane points and the
+         arrow under it. Vertical drift is ignored rather than
+         disqualifying, so a diagonal pull still reads; only a
+         mostly-vertical one fails to accumulate. */
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (dx <= 0) { director.drag = 0; return; }
+      if (Math.abs(dy) > Math.abs(dx) * 2.5) return;
+      director.drag = Math.min(1, dx / dragThreshold());
+      /* Once it releases, this gesture is finished: the finger staying down
+         cannot roll straight on into the next destination. */
+      if (director.drag >= 1) spent = true;
+    };
+
+    const up = () => {
+      /* Same gesture, second chance: Safari is happiest granting playback
+         on the end of a touch, and by here the drag is certainly real. */
+      if (active && music) music.bless();
+      active = false;
+      /* a short pull that never reached the threshold simply springs back */
+      if (!spent) director.drag = 0;
+    };
+
+    const opt = { passive: true };
+    addEventListener('pointerdown', down, opt);
+    addEventListener('pointermove', move, opt);
+    addEventListener('pointerup', up, opt);
+    addEventListener('pointercancel', up, opt);
+  }
 
   function hud(st, id, local, total) {
     const c = st.ctx;
@@ -155,10 +347,12 @@
     fit();
 
     director.play();
+    initDrag();
     let last = performance.now();
     const loop = now => {
       director.advance(Math.min(.1, (now - last) / 1000));
       last = now;
+      director.syncMusic();
       director.draw();
       requestAnimationFrame(loop);
     };
@@ -309,9 +503,11 @@
         if (!director.playing) {
           director.lostFor += dt;
           if (director.lostFor > C.RESET_AFTER_LOST) director.reset();
+          director.syncMusic();          // card away: the music waits with the film
           return;
         }
         director.advance(dt);
+        director.syncMusic();
         /* Only re-upload panels that actually painted this frame — an empty
            midground costs nothing in scenes that have none. The wasDirty
            term pushes one final upload after a panel empties, so a cleared
@@ -342,6 +538,7 @@
   });
 
   async function boot() {
+    if (music) music.prime();        // buffer it now, not at 67.8s
     await Promise.all([loadImages(), loadFonts()]);
     director.draw();
 
@@ -395,6 +592,7 @@
 
     registerComponent();
     buildScene();
+    initDrag();
 
     // Safety net only: the 'camera-init' listener above is what normally
     // hides the loader, the moment the webcam feed is actually live. If a
