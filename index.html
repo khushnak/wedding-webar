@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Caveat:wght@600;700&family=Modak&family=Patrick+Hand&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="css/style.css?v=44">
+<link rel="stylesheet" href="css/style.css?v=49">
 </head>
 <body>
 
@@ -37,6 +37,29 @@
     <p class="hint-sub" id="hint-sub">Hold the card flat and fill about half the screen.</p>
   </div>
 
+  <!--
+    DRAG TO TRAVEL — screen UI, not AR.
+    This card lives in the page, fixed to the bottom of the viewport. It is
+    deliberately OUTSIDE #ar-root: it is not an a-entity, it carries no
+    marker transform, and it is painted by the browser rather than onto any
+    of the four diorama canvases. So it holds still while the film moves
+    with the card on the table. Dragging the plane here releases the
+    director's next gate, which is what advances the AR.
+  -->
+  <div id="travel" hidden>
+    <p class="travel-title">DRAG TO TRAVEL <span class="travel-arrow" aria-hidden="true">&#8594;</span></p>
+    <div class="travel-track" id="travel-track">
+      <div class="travel-line" aria-hidden="true"></div>
+      <div class="travel-fill" id="travel-fill" aria-hidden="true"></div>
+      <div class="travel-dots" id="travel-dots" aria-hidden="true"></div>
+      <img class="travel-plane" id="travel-plane" src="assets/icons/airplane.png"
+           alt="" draggable="false">
+    </div>
+    <ul class="travel-labels" id="travel-labels">
+      <li>SEINE</li><li>LOUVRE</li><li>EIFFEL</li>
+    </ul>
+  </div>
+
   <div id="error" hidden>
     <p class="hint-title">Camera unavailable</p>
     <p class="hint-sub" id="error-sub">Allow camera access, or open this page over https:// to try again.</p>
@@ -52,9 +75,9 @@
   seem to show up in the preview — a mismatched number is a much more
   reliable fix than asking for a hard refresh.
 -->
-<script src="js/config.js?v=44"></script>
-<script src="js/engine.js?v=44"></script>
-<script src="js/scenes.js?v=44"></script>
-<script src="js/main.js?v=44"></script>
+<script src="js/config.js?v=49"></script>
+<script src="js/engine.js?v=49"></script>
+<script src="js/scenes.js?v=49"></script>
+<script src="js/main.js?v=49"></script>
 </body>
 </html>

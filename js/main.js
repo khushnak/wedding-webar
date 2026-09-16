@@ -65,6 +65,16 @@
     : null;
   if (music && DEBUG) music.log = true;
 
+  /* When the travel card is on screen: the paris scene's own window on the
+     story clock, worked out the same way the music window is. */
+  const TRAVEL_AT = (() => {
+    const i = SCENES.findIndex(s => s.id === 'paris');
+    if (i < 0) return null;
+    if (ONLY) return ONLY === 'paris' ? { from: 0, to: SCENES[i].dur } : null;
+    const from = SCENES.slice(0, i).reduce((a, s) => a + s.dur, 0);
+    return { from, to: from + SCENES[i].dur };
+  })();
+
   /* ----------------------------------------------------------- the gates */
   /* A scene may declare `gates`: local times at which the film waits for the
      viewer to pull the journey forward. The clock stops dead on the gate
@@ -91,26 +101,59 @@
 
   /* ------------------------------------------------------------- loading */
 
-  function loadImages() {
-    const entries = Object.entries(C.ASSETS);
-    let done = 0;
-    return Promise.all(entries.map(([key, path]) => new Promise(resolve => {
+  /* One image bank, handed to every panel ONCE and then filled in place.
+     Stage.setImages keeps the reference, so a picture that arrives later is
+     visible to all four panels the moment it lands — which is what lets the
+     film start before the artwork has all downloaded, with no reload, no
+     re-assignment and no change to engine.js. */
+  const IMAGES = {};
+
+  function loadKeys(keys, onOne) {
+    return Promise.all(keys.map(key => new Promise(resolve => {
+      const path = C.ASSETS[key];
+      if (!path) { resolve(); return; }
       const im = new Image();
+      /* decode off the main thread: several of these are 2-3 MB PNGs, and
+         decoding them inline stalls the very frames the loader is drawing */
+      im.decoding = 'async';
       im.onload = im.onerror = () => {
-        done++;
-        el('loader-text').textContent =
-          `Loading the story… ${Math.round(done / entries.length * 100)}%`;
-        resolve([key, im]);
+        if (!im.width) console.warn('[invite] missing asset:', path);
+        IMAGES[key] = im;
+        if (onOne) onOne();
+        resolve();
       };
       im.src = 'assets/' + path;
-    }))).then(pairs => {
-      const map = {};
-      pairs.forEach(([k, im]) => {
-        if (!im.width) console.warn('[invite] missing asset:', C.ASSETS[k]);
-        map[k] = im;
-      });
-      STAGES.forEach(st => st.setImages(map));
-    });
+    })));
+  }
+
+  /* Two phases. The returned promise settles when the OPENING is ready, so
+     that is all the film waits for; the remainder is then requested in the
+     background, in ASSETS order (which runs roughly in story order), and
+     keeps arriving while the viewer is still pointing at the card and
+     tapping to start. Nothing is dropped and nothing is fetched twice —
+     every key in ASSETS is still loaded, just not all of it up front. */
+  function loadImages() {
+    const all = Object.keys(C.ASSETS);
+    const firstSet = new Set((C.PRELOAD || all).filter(k => C.ASSETS[k]));
+    const first = all.filter(k => firstSet.has(k));
+    /* the late-story heroes jump the background queue — see PRELOAD_NEXT */
+    const nextSet = new Set((C.PRELOAD_NEXT || []).filter(k => C.ASSETS[k] && !firstSet.has(k)));
+    const next = all.filter(k => nextSet.has(k));
+    const rest = all.filter(k => !firstSet.has(k) && !nextSet.has(k));
+
+    STAGES.forEach(st => st.setImages(IMAGES));
+
+    let done = 0;
+    const tick = () => {
+      done++;
+      el('loader-text').textContent =
+        `Loading the story… ${Math.round(done / first.length * 100)}%`;
+    };
+    /* The percentage tracks the opening set only. That is not a cosmetic
+       rescale: the opening set IS what the loading screen is now waiting
+       for, so the bar reaches 100% exactly when the film can begin. */
+    return loadKeys(first, tick)
+      .then(() => { loadKeys(next).then(() => loadKeys(rest)); });
   }
 
   /* Fonts must be ready before the first frame or the first titles pop in
@@ -154,6 +197,10 @@
       const inside = this.time >= MUSIC_AT.from && this.time < MUSIC_AT.to;
       music.update(inside, this.playing);
     },
+
+    /* keeps the travel card in step with the film, from the same per-frame
+       call that already runs the music — no extra loop, no extra listener */
+    syncTravel() { if (syncTravel) syncTravel(); },
 
     clearGates() {
       GATES.forEach(x => { x.done = false; });
@@ -235,94 +282,146 @@
     },
   };
 
-  /* ------------------------------------------------------ the gesture */
-  /* Pull the journey forward — once, at the airport. The affordance is the
-     plane and its line, so there is no control to hit: while the gate is
-     open the whole frame is the handle, which is the only thing that can
-     work reliably when the picture is a texture on an AR panel rather than
-     a DOM element under the finger.
+  /* ------------------------------------------------- drag to travel ---- */
+  /* SCREEN UI, not AR. The card is a plain fixed-position DOM element (see
+     #travel in index.html). It is not an a-entity, carries no marker
+     transform and is painted by the browser rather than onto any diorama
+     canvas, so it holds still on the glass while the film moves with the
+     printed card.
 
-     Listeners are passive and never call preventDefault, so nothing here
-     touches AR.js's own input or the page's scrolling. */
-  function initDrag() {
-    let startX = 0, startY = 0, active = false, spent = false;
+     It drives the film through the machinery that was already here rather
+     than through a second progression system of its own: the director holds
+     the clock at each gate and releases it when `director.drag` reaches 1,
+     exactly as the old in-scene gesture did. All this does is set that
+     number from a finger on the screen, so Airport -> Seine -> Louvre ->
+     Eiffel -> Proposal still advances one gate at a time, in scenes.js's
+     order, with DRAG.fallback still covering anyone who never drags. */
+  function initTravelUI() {
+    const card = el('travel');
+    const track = el('travel-track');
+    const plane = el('travel-plane');
+    const fill = el('travel-fill');
+    const dotWrap = el('travel-dots');
+    const labels = [...el('travel-labels').children];
+    if (!card || !track || !plane) return;
 
-    /* The scene publishes its target as <stage>.hit in stage coordinates,
-       and clears it to null on any pass that is not showing the plane. Now
-       that the film is split across diorama panels the box is published on
-       whichever panel paints the affordance, so take the first panel that
-       has one. In preview there is only ever a single stage, so this is
-       exactly the lookup it has always been. */
-    const hitBox = () => {
-      for (const st of STAGES) if (st.hit) return st.hit;
-      return null;
+    const STOPS = labels.length;                 // seine, louvre, eiffel, proposal
+    /* Fractional position of each stop along the track, plus the plane's
+       parking spot at the left before any travelling has happened. */
+    const at = i => (i / STOPS) * 100;
+    dotWrap.innerHTML = labels.map((_, i) =>
+      `<i style="left:${at(i + 1)}%"></i>`).join('');
+    const dots = [...dotWrap.children];
+
+    let done = 0;          // stops already travelled
+    let dragging = false;
+    let spent = false;     // this gesture has already spent its one gate
+    let pending = false;   // drag finished, waiting for the gate to release
+    let startX = 0;
+
+    /* how far the plane must travel to count, in px of real screen */
+    const span = () => track.getBoundingClientRect().width / STOPS;
+
+    const paint = (frac = 0) => {
+      const base = at(done);
+      const pct = base + (at(done + 1) - base) * frac;
+      plane.style.left = pct + '%';
+      fill.style.width = pct + '%';
+      dots.forEach((d, i) => {
+        d.classList.toggle('done', i < done);
+        d.classList.toggle('next', i === done);
+      });
+      labels.forEach((l, i) => {
+        l.classList.toggle('done', i < done);
+        l.classList.toggle('next', i === done);
+      });
     };
 
-    /* Is this pointer on the affordance? In preview the canvas is laid out
-       on screen, so the pointer maps onto it exactly and only the plane, its
-       line and the forgiving patch around them are draggable. Under AR the
-       canvas is parked off-screen (css left:-10000px) and painted onto a
-       THREE panel instead, so no such mapping exists — there the gesture is
-       accepted anywhere, which is the only thing that works reliably and
-       costs nothing, since the gate is open solely while the plane is
-       sitting there waiting. */
-    const onTarget = e => {
-      const hit = hitBox();
-      if (!hit) return false;
-      const r = canvas.getBoundingClientRect();
-      if (!r.width || !r.height || r.right < 0 || r.left > innerWidth) return true;
-      const sx = (e.clientX - r.left) / r.width * C.STAGE.logicalW;
-      const sy = (e.clientY - r.top) / r.height * C.STAGE.logicalH;
-      return sx >= hit.x0 && sx <= hit.x1 && sy >= hit.y0 && sy <= hit.y1;
-    };
+    /* Called every frame by the director so the card mirrors the film: which
+       stop we are on comes from the gates themselves, never from a counter
+       kept in here, so the two can never disagree. */
+    function sync() {
+      const inParis = TRAVEL_AT &&
+        director.time >= TRAVEL_AT.from && director.time < TRAVEL_AT.to;
+      /* Gone the moment the last leg lands: they have arrived in Paris, and
+         the proposal that follows is the film's to play, not the viewer's to
+         trigger. Hiding it also puts the interaction physically out of reach,
+         so there is no way to drag on into the proposal by accident. */
+      const travelling = GATES.some(g => !g.done);
+      card.hidden = !inParis || !travelling;
+      if (card.hidden) return;
+      const d = GATES.filter(g => g.done).length;
+      /* `pending` closes a race: a completed drag moves the plane onto its
+         new stop immediately, but the director only marks the gate done on
+         its next advance(). Without this the count read here would be one
+         behind for those few frames and would snap the plane back to the
+         stop it had just left. */
+      if (pending && d >= done) pending = false;
+      if (!pending && d !== done && !dragging) { done = Math.min(d, STOPS); paint(0); }
+      card.classList.toggle('ready', !!director.held);
+    }
 
     const down = e => {
-      if (!director.held) return;         // only while the journey is waiting
-      if (!onTarget(e)) return;           // and only on the plane itself
-      /* The one gesture in the film, so the one chance to make the music
-         legal. bless() is a silent muted play/pause that buys the browser's
-         permission to start the track from script later; it does not start
-         anything now, and the sangeet is still what begins the music twelve
-         seconds from here. Nothing about the drag itself changes. */
-      if (music) music.bless();
-      active = true;
+      if (!director.held || done >= STOPS) return;   // only while a gate waits
+      /* Forgiving: anywhere on the card's track starts the drag, not just
+         the plane's own few pixels. */
+      dragging = true;
       spent = false;
       startX = e.clientX;
-      startY = e.clientY;
+      card.classList.add('dragging');
+      /* Unchanged audio behaviour: this is still the gesture that buys
+         playback permission, exactly as the in-scene drag did. */
+      if (music) music.bless();
       director.drag = 0;
+      if (plane.setPointerCapture && e.pointerId != null) {
+        try { plane.setPointerCapture(e.pointerId); } catch (err) { /* fine */ }
+      }
     };
 
     const move = e => {
-      if (!active || spent) return;
-      /* Forward is RIGHTWARD, matching the way the plane points and the
-         arrow under it. Vertical drift is ignored rather than
-         disqualifying, so a diagonal pull still reads; only a
-         mostly-vertical one fails to accumulate. */
+      if (!dragging || spent) return;
       const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      if (dx <= 0) { director.drag = 0; return; }
-      if (Math.abs(dy) > Math.abs(dx) * 2.5) return;
-      director.drag = Math.min(1, dx / dragThreshold());
-      /* Once it releases, this gesture is finished: the finger staying down
-         cannot roll straight on into the next destination. */
-      if (director.drag >= 1) spent = true;
+      if (dx <= 0) { director.drag = 0; paint(0); return; }
+      const frac = Math.min(1, dx / span());
+      director.drag = frac;
+      paint(frac);
+      if (frac >= 1) {
+        /* One gesture, one destination: the finger staying down cannot roll
+           straight on into the next stop. */
+        spent = true;
+        dragging = false;
+        pending = true;                // gate releases on the next advance()
+        card.classList.remove('dragging');
+        done = Math.min(done + 1, STOPS);
+        paint(0);                      // settle onto the stop just reached
+      }
     };
 
     const up = () => {
-      /* Same gesture, second chance: Safari is happiest granting playback
-         on the end of a touch, and by here the drag is certainly real. */
-      if (active && music) music.bless();
-      active = false;
-      /* a short pull that never reached the threshold simply springs back */
-      if (!spent) director.drag = 0;
+      if (!dragging && !spent) return;
+      if (dragging && music) music.bless();   // Safari grants best on touch end
+      if (!spent) { director.drag = 0; paint(0); }   // short pull springs back
+      dragging = false;
+      card.classList.remove('dragging');
     };
 
     const opt = { passive: true };
-    addEventListener('pointerdown', down, opt);
+    /* The WHOLE CARD is the handle, not the 40px track and not the plane's
+       own few pixels. A thumb that lands on the title, on a label, or just
+       above or below the line still starts the journey — which is the
+       difference between an interaction that works on a phone and one that
+       needs a pixel-perfect press. (My own test rig missed the track by a
+       few pixels on the last leg and the drag silently did nothing; a real
+       thumb would have done the same.) */
+    card.addEventListener('pointerdown', down, opt);
     addEventListener('pointermove', move, opt);
     addEventListener('pointerup', up, opt);
     addEventListener('pointercancel', up, opt);
+
+    paint(0);
+    return sync;
   }
+  let syncTravel = null;
 
   function hud(st, id, local, total) {
     const c = st.ctx;
@@ -354,12 +453,12 @@
     fit();
 
     director.play();
-    initDrag();
+    syncTravel = initTravelUI();
     let last = performance.now();
     const loop = now => {
       director.advance(Math.min(.1, (now - last) / 1000));
       last = now;
-      director.syncMusic();
+      director.syncMusic(); director.syncTravel();
       director.draw();
       requestAnimationFrame(loop);
     };
@@ -466,6 +565,22 @@
     function onTap() {
       if (started || !director.found) return;
       started = true;
+      /* Buy the browser's permission to play audio here, on the tap that
+         starts the film. This is not a new interaction — it is the tap the
+         viewer already has to make, and the film cannot begin without it, so
+         by the time the sangeet arrives the permission is always in hand.
+
+         The airport drag still blesses too, but it could not be relied on by
+         itself: a viewer who never drags is carried past the gate by
+         DRAG.fallback, and nothing else on a phone ever grants playback.
+         Desktop hid this, because Chrome gives a page document-wide
+         activation from any stray click — which is exactly why
+         celebrations.mp3 played there and stayed silent on the handset.
+
+         A click is also the gesture Safari honours most reliably, and
+         bless() is idempotent and silent (a muted play/pause), so nothing is
+         heard here and nothing starts early. */
+      if (music) music.bless();
       el('hint').hidden = true;
       syncPlaying();
     }
@@ -510,7 +625,15 @@
            keep the bottom edge planted whatever dioramaScale is set to.
            The clearance itself stays unscaled — it is an absolute gap. */
         this.zoom = m.dioramaScale || 1;
-        group.position.set(0, this.zoom * (h / 2) * Math.cos(tilt) + m.height * 0.05, 0);
+        /* ...plus MARKER.frameLift, which lifts the whole diorama so the
+           lower band of every panel clears the bottom of the phone frame.
+           See the note in config.js — this is tilt framing, not a fix for
+           any scene's coordinates, and it is AR-only because this component
+           is never constructed in ?preview. */
+        group.position.set(0,
+          this.zoom * (h / 2) * Math.cos(tilt)
+            + m.height * 0.05
+            + this.zoom * h * (m.frameLift || 0), 0);
         this.baseY = group.position.y;
         this.group = group;
         this.el.setObject3D('mesh', group);
@@ -563,11 +686,11 @@
         if (!director.playing) {
           director.lostFor += dt;
           if (director.lostFor > C.RESET_AFTER_LOST) director.reset();
-          director.syncMusic();          // card away: the music waits with the film
+          director.syncMusic(); director.syncTravel();          // card away: the music waits with the film
           return;
         }
         director.advance(dt);
-        director.syncMusic();
+        director.syncMusic(); director.syncTravel();
         /* Only re-upload panels that actually painted this frame — an empty
            midground costs nothing in scenes that have none. The wasDirty
            term pushes one final upload after a panel empties, so a cleared
@@ -659,7 +782,7 @@
 
     registerComponent();
     buildScene();
-    initDrag();
+    syncTravel = initTravelUI();
 
     // Safety net only: the 'camera-init' listener above is what normally
     // hides the loader, the moment the webcam feed is actually live. If a

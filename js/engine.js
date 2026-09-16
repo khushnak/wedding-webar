@@ -200,7 +200,16 @@ const E = (() => {
     /* o: x, y, size, font ('display'|'script'|'body'), color, align,
           alpha, rot, ls (letter spacing), outline (px), outlineColor,
           scale, baseline                                                   */
+    /* INK GATE. Everything below draws with the 2D context rather than from
+       an image, so it has no asset key and wants() cannot place it. Left
+       ungated it painted onto all four diorama panels at once, which on a
+       phone showed as four copies of every title, trail and badge standing
+       at four different depths: ghosted, and with the nearest copy hanging
+       lowest, which is what made text and the travel plane read as "too
+       low" in AR. It is authored as flat 2D ink over the picture, so it
+       belongs on one panel. Preview passes (layer === null) are unaffected. */
     text(str, o = {}) {
+      if (!this.on('characters')) return;
       const c = this.ctx;
       const size = o.size || 60;
       const fam = this.cfg.FONTS[o.font || 'display'].replace('{size}', size);
@@ -245,6 +254,7 @@ const E = (() => {
 
     /* Several lines with one call. */
     textBlock(lines, o = {}) {
+      if (!this.on('characters')) return;
       const gap = o.lineHeight || (o.size || 46) * 1.35;
       lines.forEach((l, i) => {
         if (!l) return;
@@ -255,6 +265,7 @@ const E = (() => {
 
     /* ------------------------------------------------------------ shapes */
     badge(x, y, r, o = {}) {
+      if (!this.on('characters')) return;
       if (!this.on('characters')) return;
       this.dirty = true;
       const c = this.ctx;
@@ -296,6 +307,7 @@ const E = (() => {
 
     heart(x, y, s, o = {}) {
       if (!this.on('characters')) return;
+      if (!this.on('characters')) return;
       this.dirty = true;
       const c = this.ctx;
       c.save();
@@ -320,6 +332,7 @@ const E = (() => {
 
     star(x, y, s, o = {}) {
       if (!this.on('characters')) return;
+      if (!this.on('characters')) return;
       this.dirty = true;
       const c = this.ctx;
       c.save();
@@ -340,6 +353,7 @@ const E = (() => {
 
     /* Comic impact shape. */
     burst(x, y, r, o = {}) {
+      if (!this.on('characters')) return;
       if (!this.on('characters')) return;
       this.dirty = true;
       const c = this.ctx;
@@ -369,6 +383,7 @@ const E = (() => {
     /* Radiating ink strokes: surprise, impact, excitement. */
     rays(x, y, o = {}) {
       if (!this.on('characters')) return;
+      if (!this.on('characters')) return;
       this.dirty = true;
       const c = this.ctx;
       const n = o.count || 8;
@@ -395,6 +410,7 @@ const E = (() => {
        gradient, not a hard shape - in AR it has to melt into the camera feed. */
     ground(y, o = {}) {
       if (!this.on('characters')) return;
+      if (!this.on('characters')) return;
       this.dirty = true;
       const c = this.ctx;
       const w = o.w || 560, h = o.h || 120, cy = y + (o.dip || 40);
@@ -414,6 +430,7 @@ const E = (() => {
     }
 
     shadow(x, y, w, alpha = 1) {
+      if (!this.on('characters')) return;
       if (!this.on('characters')) return;
       this.dirty = true;
       const c = this.ctx;
@@ -438,6 +455,9 @@ const E = (() => {
     /* Dashed travel trail revealed to `p` (0..1). Returns the head point and
        its angle so you can sit an aeroplane on it. */
     trail(p0, cp, p1, prog, o = {}) {
+      /* deliberately NOT gated at the top: the dashes are gated further
+         down, but every panel must still run through to the return below,
+         because scenes sit the aeroplane on the head point it hands back */
       const c = this.ctx;
       const n = 42;
       const end = clamp(prog);
@@ -470,6 +490,7 @@ const E = (() => {
     }
 
     polyline(pts, o = {}) {
+      if (!this.on('characters')) return;
       if (!this.on('characters')) return;
       this.dirty = true;
       const c = this.ctx;

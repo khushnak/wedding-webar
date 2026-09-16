@@ -159,7 +159,26 @@ const CONFIG = {
     keys: {
       background: ['gardenBg', 'collegeBg', 'airportBg', 'riverBg', 'louvreBg', 'eiffelBg'],
       midground: ['gardenMid', 'collegeMid', 'airportMid'],
-      foreground: ['gardenFg', 'collegeFg', 'airportFg', 'riverFg', 'louvreFg', 'eiffelFg', 'roadFg'],
+      /* NOTE riverFg is deliberately NOT here. Every other *Fg is scenery
+         standing in front of the couple, but the Seine's "foreground" IS the
+         boat they are sitting in. On its own panel 0.22 in front of them the
+         parallax pulled it off the couple, so it read as a boat-shaped card
+         floating in front of two people rather than a hull they are inside.
+         Painting it on the characters panel puts it back in the same picture
+         as them, in the draw order the scene already uses — the hull covers
+         their lower bodies, exactly as it does in preview. */
+      foreground: ['gardenFg', 'collegeFg', 'airportFg', 'louvreFg', 'eiffelFg'],
+      /* Art the couple physically TOUCH cannot live on its own panel. The
+         foreground sits 0.22 in front of them, and on a phone that gap
+         parallaxes the two apart: the Seine's boat drifted off the couple
+         sitting in it, and the forked road slid out below and in front of
+         the two standing on it, so they floated above a road that was no
+         longer under their feet. Painting these on the characters panel
+         puts them back in one picture, in the draw order the scenes already
+         use — the road under their shoes, the hull over their legs. The
+         *Fg keys left above are true scenery: corner vignettes and the two
+         landmarks, none of which anybody stands on. */
+      characters: ['riverFg', 'roadFg'],
     },
     depth: {
       background: -0.55,
@@ -168,6 +187,58 @@ const CONFIG = {
       foreground: 0.22,
     },
   },
+
+  /* ------------------------------------------------------------- preload */
+  /* The artwork the FIRST TWO SCENES need, and nothing else. Only these are
+     waited for before the film can start; every other key in ASSETS below is
+     fetched straight afterwards, in the background, while the viewer is still
+     finding the card and tapping to begin.
+
+     The whole of ASSETS is 89 MB of PNG. Waiting for all of it before the
+     first frame is what made the loading screen crawl on a phone: 85 images
+     were requested at once, a mobile browser will only run about six of them
+     at a time, and several are 2-3 MB each, so the early percentages moved at
+     the speed of the largest files in the queue. This list is 24 MB — the
+     same pictures, a 73% smaller gate.
+
+     It is written out by hand on purpose. Scanning the scene code for asset
+     names cannot be trusted: the hobby badges are named in CAST rather than
+     in scenes.js, and the garden layers are drawn from a shared helper that
+     belongs to no single scene, so an automatic scan silently misses them
+     and the film opens with holes in it.
+
+     If you add artwork to the opening, add its key here too. Getting it wrong
+     is not fatal — a picture that has not arrived yet simply is not painted
+     (see sprite() in engine.js) and appears as soon as it lands — but it is
+     the difference between a clean open and a brief gap. */
+  PRELOAD: [
+    /* Scene 1's garden, all three layers */
+    'gardenBg', 'gardenMid', 'gardenFg',
+    /* Rahul and Arya, plus the poses they snap to on their title beats */
+    'rahulIntro', 'aryaIntro', 'rahulHappy', 'aryaHappy', 'rahulPose', 'aryaPose',
+    /* the hobby badges — named in CAST, not in scenes.js */
+    'cricket', 'photography', 'music', 'travel',
+    'painting', 'dancing', 'hiking', 'baking',
+    /* the airplane that carries scene 1 into scene 2 */
+    'travelAirplane',
+  ],
+
+  /* Fetched immediately after PRELOAD and before everything else, but NOT
+     waited for — the film is already running by then. These are the hero
+     pictures of the scenes furthest from the start, which is exactly why
+     they were the ones that failed: the background phase works through
+     ASSETS in declaration order, and rahul_propose (~67s) and wedding_2
+     (~76s) sit late in that list, so on a phone the story reached them
+     before the queue did. Both files exist and both keys are correct; they
+     were simply last in line. Pulling them to the front of the background
+     queue costs nothing at startup and gives them the whole film to
+     arrive. */
+  PRELOAD_NEXT: [
+    'rahulPropose',
+    'wedding1', 'wedding2',
+    'sangeet1', 'sangeet2',
+    'reception1', 'reception2',
+  ],
 
   /* --------------------------------------------------------------- fonts */
   /* When the handwriting/display font arrives, change these two strings. */
@@ -386,6 +457,24 @@ const CONFIG = {
        the depths where they are and flatten the diorama out. The rise
        animation multiplies into this, so its timing is unaffected. */
     dioramaScale: 0.6,
+    /* AR-ONLY vertical framing, in plane heights. Nothing in the artwork is
+       mispositioned: "ONE DAY" sits at y 475 and "ON VACATION" at y 615 of a
+       941-tall stage, and the first flight path enters at y 640 — all of
+       which frame correctly in ?preview. What moves them is tiltDeg. The
+       panels lean back, so seen from a phone held above the card the lower
+       part of each panel is nearer the lens than the upper part, and
+       perspective magnifies it and carries it toward (and past) the bottom
+       of the screen. The title and the plane's entry arc both live in that
+       lower band, which is why they alone read as "too low" on a phone and
+       nowhere else.
+
+       Lifting the whole diorama is the fix that leaves every coordinate,
+       animation and pace alone: it raises the bottom band back into frame
+       for every scene at once. Raise it if content still sits low on your
+       phone, lower it toward 0 if the film starts floating off the card.
+       This is applied in story-plane (main.js), which only ever runs in AR,
+       so ?preview is untouched by it. */
+    frameLift: 0.26,
     smoothing: { count: 5, tolerance: 0.02, threshold: 5 },
   },
 };

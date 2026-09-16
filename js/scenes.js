@@ -1058,7 +1058,7 @@ const SCENES = (() => {
         if (!pose) return;
         g.text(w, {
           x: CX, y: 330 + i * 190, size: 175, font: 'title',
-          color: P.marigold, scale: pose.scale, rot: pose.rot, outline: 0,
+          color: '#ffffff', scale: pose.scale, rot: pose.rot, outline: 0,
         });
       });
     }
@@ -1124,14 +1124,14 @@ const SCENES = (() => {
       const big = lifePunch(t - OD_TITLE_T0);
       if (big) {
         g.text('ONE DAY', {
-          x: CX, y: 475, size: 230, font: 'title', color: P.chilli,
+          x: CX, y: 475, size: 230, font: 'title', color: '#ffffff',
           scale: big.scale, rot: big.rot, outline: 0,
         });
       }
       const small = lifePunch(t - OD_SUB_T0);
       if (small) {
         g.text('ON VACATION', {
-          x: CX, y: 615, size: 110, font: 'title', color: P.ink,
+          x: CX, y: 615, size: 110, font: 'title', color: '#ffffff',
           scale: small.scale, rot: small.rot, outline: 0,
         });
       }
@@ -1284,43 +1284,19 @@ const SCENES = (() => {
      gesture goes. Offsets below are signed shifts of the whole assembly in
      stage px: negative while it is still arriving from the left, positive
      once it is being pulled away to the right.
-       PA_PULL_IN    how far left it starts, before the peek
-       PA_PULL_GIVE  how far it yields rightward under a full pull
-       PA_PULL_EXIT  how far it carries on once the gesture lands */
+       The on-screen geometry that used to sit here is gone: the affordance
+       is now a DOM card on the phone, not artwork inside the film. */
   /* A short intentional beat on the happy pose, then the affordance noses
      in. PA_PEEK_DUR settles it .05 before the gate parks, so it is genuinely
      motionless while it waits rather than frozen mid-approach. */
   const PA_PULL_LEAD = .45, PA_PEEK_DUR = .40;
   const PA_PULL_T0 = PA_BIGHAPPY_T0 + PA_PULL_LEAD;                   // 6.08
 
-  /* ONE gate, at the airport only: the viewer starts the journey once and
-     the Seine, the Louvre and the Eiffel then follow on their own. Derived
-     from the story above, so the affordance can never drift back into a
-     long empty wait. main.js reads PA_GATES. */
+  /* The stops, in order. Declared before anything derives from them. */
   const PA_SEINE_T0 = PA_PULL_T0 + PA_PEEK_DUR + .05;                 // 6.53
   const PA_LEG = 3.30;                      // arrive, story moment, line out
   const PA_LOUVRE_T0 = PA_SEINE_T0 + PA_LEG;                          // 9.83
   const PA_EIFFEL_T0 = PA_LOUVRE_T0 + PA_LEG;                         // 13.13
-  /* 0.03 BEFORE the Seine's t0, not on it. `cur` advances on t >= t0, so a
-     gate sitting exactly on it would park the clock on the first frame that
-     already belongs to the Seine — and the airport's plane and prompt,
-     which only draw while cur === 0, would vanish for the whole hold. */
-  const PA_GATES = [PA_SEINE_T0 - .03];                               // 6.50
-  const PA_PULL_IN = 760, PA_PULL_GIVE = 62, PA_PULL_EXIT = 1560;
-  const PA_PULL_OUT = .38;
-  /* Parked in the clear band on the left: below the AIRPORT sign, above the
-     suitcase, and entirely left of Rahul (who spans x 691-981), so neither
-     the line nor the prompt crosses a character or the signage. */
-  /* Parked in the clear band on the left. The trail is BEHIND the plane, so
-     with the plane facing right the trail runs back to the left edge and the
-     plane sits at the right-hand end of it. */
-  const PA_PULL_A = { x: 232, y: 330 };         // the trail, behind it
-  const PA_PULL_CP = { x: 366, y: 356 };
-  const PA_PULL_B = { x: 508, y: 380 };         // the plane itself
-  const PA_PULL_LABEL = { x: 430, y: 486, size: 52 };
-  /* The white paper patch the whole thing sits on, so it reads against the
-     busy terminal. Wraps the content; no border, no shadow, no card. */
-  const PA_PULL_PAD = { x0: 168, y0: 300, x1: 700, y1: 522, r: 46 };
 
   /* Proposal, once the Eiffel foreground has settled. Every swap here is an
      instant cutout change — the only thing that is slow is the HOLD on her
@@ -1329,6 +1305,40 @@ const SCENES = (() => {
   const PA_EIFFEL_SET = PA_EIFFEL_T0 + PA_SLIDE_DUR + PA_SETTLE;      // 15.30
   const PA_PROPOSE_T0 = PA_EIFFEL_SET + .35;                          // 15.65
   const PA_ARYA_REACT_T0 = PA_PROPOSE_T0 + .15;                       // 15.80
+
+  /* One gate per leg of the journey, so each drag of the screen card moves
+     the film on by exactly ONE destination and no more. Until now there was
+     a single gate and Seine -> Louvre -> Eiffel played themselves; the card
+     shows four stops, so there are four holds. Scene LENGTH is untouched —
+     a gate stops the clock, it never retimes anything. main.js reads this.
+
+     Each sits .03 BEFORE its destination's t0, never on it: `cur` advances
+     on t >= t0, so a gate exactly on the boundary would park the clock on
+     the first frame that already belongs to the next stop.
+
+     Declared here, after PA_PROPOSE_T0 — these are `const`, so referring to
+     a stop above before its declaration is a temporal-dead-zone error that
+     takes the whole file down. */
+  const PA_GATES = [
+    PA_SEINE_T0 - .03,      // 6.50   airport -> seine
+    PA_LOUVRE_T0 - .03,     // 9.80   seine   -> louvre
+    PA_EIFFEL_T0 - .03,     // 13.10  louvre  -> eiffel
+  ];
+  /* ONE GATE PER TRAVEL LEG, AND NOTHING AFTER THE LAST ONE.
+     There were four holds here; the fourth sat at PA_PROPOSE_T0 and asked
+     the viewer to drag the proposal into existence, which is not a journey
+     at all — it happens where they already are, at the Eiffel. Arriving
+     there IS arriving in Paris, so the travel interaction is finished the
+     moment that third drag lands.
+
+     Everything from here runs on the clock alone and always did:
+       PA_PROPOSE_T0    15.65  Rahul drops to one knee
+       PA_ARYA_REACT_T0 15.80  her surprise
+       PA_ARYA_JOY_T0   17.80  she breaks into joy
+       PA_WIPE_T0       18.60  the hand-off into the celebrations
+     All plain `t >=` checks with no gate among them, so taking the fourth
+     hold away restores the proposal to playing by itself. No timing, pose
+     or artwork below moves. */
   const PA_ARYA_SURPRISE_HOLD = 2.0;
   const PA_ARYA_JOY_T0 = PA_ARYA_REACT_T0 + PA_ARYA_SURPRISE_HOLD;    // 17.80
   const PA_WIPE_T0 = PA_ARYA_JOY_T0 + .80, PA_WIPE_DUR = 1.6;         // 17.08 -> 18.68                         // -> 23.5
@@ -1545,79 +1555,15 @@ const SCENES = (() => {
        plane at the head of the line eases forward under the finger, so the
        gesture feels like it is moving the journey. It is not a second
        animation; it is the same line and the same plane, nudged. */
-    if (next && cur === 0) {
-      /* THE interaction. Peek in, stop dead, wait. Nothing here moves on its
-         own once it has arrived — the only thing that shifts it is the
-         finger, and then the release. */
-      const peek = p(t, PA_PULL_T0, PA_PEEK_DUR, ease.out);
-      if (peek > 0) {
-        const drag = clamp(g.drag || 0);
-        const off = (1 - peek) * -PA_PULL_IN            // still arriving
-          + drag * PA_PULL_GIVE                          // yielding to the pull
-          + ease.in(pl(t, next.t0, PA_PULL_OUT)) * PA_PULL_EXIT;   // gone
-        const sh = pt => ({ x: pt.x + off, y: pt.y });
-
-        /* the paper patch, first, so everything else sits on it */
-        const pad = PA_PULL_PAD, px0 = pad.x0 + off, px1 = pad.x1 + off;
-        g.ctx.save();
-        g.ctx.globalAlpha = .93;
-        g.ctx.fillStyle = '#ffffff';
-        g.ctx.beginPath();
-        g.ctx.moveTo(px0 + pad.r, pad.y0);
-        g.ctx.lineTo(px1 - pad.r, pad.y0);
-        g.ctx.quadraticCurveTo(px1, pad.y0, px1, pad.y0 + pad.r);
-        g.ctx.lineTo(px1, pad.y1 - pad.r);
-        g.ctx.quadraticCurveTo(px1, pad.y1, px1 - pad.r, pad.y1);
-        g.ctx.lineTo(px0 + pad.r, pad.y1);
-        g.ctx.quadraticCurveTo(px0, pad.y1, px0, pad.y1 - pad.r);
-        g.ctx.lineTo(px0, pad.y0 + pad.r);
-        g.ctx.quadraticCurveTo(px0, pad.y0, px0 + pad.r, pad.y0);
-        g.ctx.fill();
-        g.ctx.restore();
-
-        /* the drag target, in stage coordinates, published for main.js —
-           the patch plus a generous margin, never the whole frame */
-        g.hit = { x0: px0 - 70, y0: pad.y0 - 70, x1: px1 + 70, y1: pad.y1 + 70 };
-
-        g.trail(sh(PA_PULL_A), sh(PA_PULL_CP), sh(PA_PULL_B), 1, hopInk);
-        /* nose pointing the way it is about to go — and the way to pull */
-        g.sprite('airplane', {
-          x: PA_PULL_B.x + off, y: PA_PULL_B.y, h: 104, anchor: 'center',
-        });
-
-        /* The prompt, in the film's own handwriting, sitting under the
-           plane so the two read as one object. It goes the moment the
-           gesture is clearly under way, and never comes back — there is no
-           second gate to prompt for. Patrick Hand has no U+2190, so the
-           arrow is stroked rather than typed; a text arrow renders as an
-           empty box. */
-        /* <= next.t0, not <: the clock parks exactly ON the gate frame for
-           the whole hold, so a strict < would never show the prompt at all. */
-        if (peek >= .9 && t <= next.t0 && drag < .12) {
-          const lx = PA_PULL_LABEL.x + off;
-          g.text('drag to travel', {
-            x: lx, y: PA_PULL_LABEL.y, size: PA_PULL_LABEL.size,
-            font: 'handwriting', color: P.ink, outline: 0, rot: -1.5,
-          });
-          /* arrow pointing RIGHT, matching the plane and the gesture.
-             Stroked rather than typed: Patrick Hand has no arrow glyph, so
-             a text arrow renders as an empty box. */
-          const ax = lx + 138, ay = PA_PULL_LABEL.y - 16;
-          g.ctx.save();
-          g.ctx.strokeStyle = P.ink;
-          g.ctx.lineWidth = 6;
-          g.ctx.beginPath();
-          g.ctx.moveTo(ax, ay);
-          g.ctx.lineTo(ax + 52, ay);
-          g.ctx.moveTo(ax + 35, ay - 13);
-          g.ctx.lineTo(ax + 52, ay);
-          g.ctx.lineTo(ax + 35, ay + 13);
-          g.ctx.stroke();
-          g.ctx.restore();
-        }
-      }
-    } else if (next) {
-      /* every later leg is purely cinematic — no prompt, no gate, no drag */
+    /* Every leg is purely cinematic now: the line draws and the plane flies
+       it. The interaction that used to live here — the white paper patch,
+       the peeking plane and the handwritten "drag to travel" prompt, all
+       painted into the film itself — has moved off the artwork entirely and
+       onto the phone screen as a DOM card (#travel in index.html, driven by
+       initTravelUI in main.js). The clock still holds at every gate exactly
+       as it did; only the thing the viewer puts a finger on has changed, so
+       nothing here needs to publish a hit box any more. */
+    if (next) {
       const hp = pl(q(t, C.STAGE.choppy), next.t0 - PA_LINE_DRAW, PA_LINE_DRAW);
       if (hp > 0) {
         const h = PA_HOPS[cur];
@@ -1946,6 +1892,21 @@ const SCENES = (() => {
   }
 
   function celebrations(g, t) {
+    /* SINGLE-PANEL SCENE. The three event cards are flat graphic
+       compositions, not depth compositions: the colour field, the confetti,
+       the hanging decor, the couple and the type are all one picture, and
+       every other scene's sense of "background" simply does not apply.
+
+       Run once per diorama panel like everything else, each card painted its
+       opaque full-frame field onto all four canvases — including the
+       foreground panel, which stands nearest the viewer. That sheet of flat
+       colour then covered the couple and the type standing behind it, which
+       is why the last two celebrations came up blank in AR with only the
+       field and a little confetti showing. Painting the whole card on one
+       panel restores exactly the composition the preview has always drawn;
+       nothing about the design, timing or artwork changes. */
+    if (!g.on('characters')) return;
+
     const each = C.SCENE_SECONDS.celebrations / C.EVENTS.length;
 
     const i = Math.min(C.EVENTS.length - 1, Math.floor(t / each));
