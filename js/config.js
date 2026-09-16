@@ -97,6 +97,18 @@ const CONFIG = {
   /* Pause at the end before the film loops. */
   LOOP_GAP: 1.6,
 
+  /* --------------------------------------------------------------- audio */
+  /* One track, for the celebrations only — sangeet, wedding and reception
+     are three cards of a single sequence, so they share a single soundtrack
+     that runs from the first frame of SANGEET to the last frame of
+     RECEPTION and never restarts in between. Scenes 1-6 are silent.
+     Keep the volume in the 0.35-0.45 range: this is background music under
+     a film with no dialogue, not the thing being listened to. */
+  AUDIO: {
+    celebrations: 'assets/audio/celebrations.mp3',
+    volume: 0.38,
+  },
+
   /* --------------------------------------------------------------- stage */
   /* Landscape, matching the native pixel size of the Scene 1 garden art
      (assets/background/garden_*.png are 1672x941) so those three layers

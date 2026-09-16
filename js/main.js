@@ -24,6 +24,34 @@
   const TOTAL = SCENES.reduce((a, s) => a + s.dur, 0);
   const RUN = ONLY ? (SCENES.find(s => s.id === ONLY) || {}).dur || TOTAL : TOTAL;
 
+  /* ------------------------------------------------------------- music */
+  /* Sangeet, wedding and reception are three cards of ONE scene, so the
+     music is one window on the story clock rather than three cues: it opens
+     on the first frame of the celebrations scene and closes on its last.
+     Nothing inside that window touches the track, which is what keeps the
+     same playback position running across all three cards.
+
+     The window is derived from the playlist, so re-timing a scene in
+     config.js moves the music with it and nothing here needs editing. Note
+     it is story time, not wall-clock: the paris drag gates stop the clock,
+     and the music waits with it. */
+  const MUSIC_AT = (() => {
+    const i = SCENES.findIndex(s => s.id === 'celebrations');
+    if (i < 0) return null;
+    /* ?scene=celebrations previews the sequence on its own clock; any other
+       single-scene preview is one of the silent scenes. */
+    if (ONLY) return ONLY === 'celebrations' ? { from: 0, to: SCENES[i].dur } : null;
+    const from = SCENES.slice(0, i).reduce((a, s) => a + s.dur, 0);
+    return { from, to: from + SCENES[i].dur };
+  })();
+  /* The film uses only the opening stretch of the file — exactly as many
+     seconds as the celebrations scene is long, so the music can never run on
+     past the picture even if the mp3 is minutes longer (this one is 346s). */
+  const music = (MUSIC_AT && C.AUDIO && C.AUDIO.celebrations)
+    ? new E.Track(C.AUDIO.celebrations, C.AUDIO.volume, MUSIC_AT.to - MUSIC_AT.from)
+    : null;
+  if (music && DEBUG) music.log = true;
+
   /* ----------------------------------------------------------- the gates */
   /* A scene may declare `gates`: local times at which the film waits for the
      viewer to pull the journey forward. The clock stops dead on the gate
@@ -97,6 +125,16 @@
       this.time = START_AT;
       this.lastDraw = -1;
       this.clearGates();
+      if (music) music.stop();       // a restarted film restarts silent
+    },
+
+    /* Called once per frame, alongside advance(). It only reports where the
+       clock is; Track decides whether that means starting, continuing or
+       stopping, so play() is never issued from a drawing path. */
+    syncMusic() {
+      if (!music) return;
+      const inside = this.time >= MUSIC_AT.from && this.time < MUSIC_AT.to;
+      music.update(inside, this.playing);
     },
 
     clearGates() {
@@ -204,6 +242,12 @@
     const down = e => {
       if (!director.held) return;         // only while the journey is waiting
       if (!onTarget(e)) return;           // and only on the plane itself
+      /* The one gesture in the film, so the one chance to make the music
+         legal. bless() is a silent muted play/pause that buys the browser's
+         permission to start the track from script later; it does not start
+         anything now, and the sangeet is still what begins the music twelve
+         seconds from here. Nothing about the drag itself changes. */
+      if (music) music.bless();
       active = true;
       spent = false;
       startX = e.clientX;
@@ -228,6 +272,9 @@
     };
 
     const up = () => {
+      /* Same gesture, second chance: Safari is happiest granting playback
+         on the end of a touch, and by here the drag is certainly real. */
+      if (active && music) music.bless();
       active = false;
       /* a short pull that never reached the threshold simply springs back */
       if (!spent) director.drag = 0;
@@ -275,6 +322,7 @@
     const loop = now => {
       director.advance(Math.min(.1, (now - last) / 1000));
       last = now;
+      director.syncMusic();
       director.draw();
       requestAnimationFrame(loop);
     };
@@ -371,9 +419,11 @@
         if (!director.playing) {
           director.lostFor += dt;
           if (director.lostFor > C.RESET_AFTER_LOST) director.reset();
+          director.syncMusic();          // card away: the music waits with the film
           return;
         }
         director.advance(dt);
+        director.syncMusic();
         if (director.draw()) this.tex.needsUpdate = true;
       },
     });
@@ -395,6 +445,7 @@
   });
 
   async function boot() {
+    if (music) music.prime();        // buffer it now, not at 67.8s
     await Promise.all([loadImages(), loadFonts()]);
     director.draw();
 

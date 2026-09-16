@@ -433,7 +433,167 @@ const E = (() => {
     }
   }
 
-  return { clamp, lerp, ease, p, pl, on, life, q, hops, bob, Stage };
+  /* ------------------------------------------------------------- audio ---
+     One element, one track, one question asked every frame: should music be
+     sounding right now? Track turns that boolean into the things an <audio>
+     element actually has — start, hold, stop — so play() is called only on a
+     transition and never once per frame, and so there is only ever one
+     instance of the track in existence.
+
+     States:
+       off      not sounding, position back at 0
+       playing  sounding
+       held     paused mid-track, position kept (the film is paused)
+       blocked  wanted, but the browser refused autoplay
+       capped   played the `limit` seconds this film uses, and stopped there
+
+     THE AUTOPLAY PROBLEM, and the one gesture this film has to solve it.
+     Browsers reject any play() that no user gesture has paid for, and the
+     music is due at 67.8s when nothing has been touched: the film starts
+     because the camera found a card, not because anyone tapped.
+
+     There is exactly one intentional interaction in the whole piece — the
+     drag at the airport, at 55.6s — and it is deliberately the only one, so
+     Track listens for nothing on its own. Instead main.js's existing drag
+     handler calls bless() on the pointer events it is already receiving,
+     twelve seconds before the music is due, and bless() spends that gesture
+     on a muted play()/pause(): the element is left permanently allowed to be
+     started from script, which is what iOS Safari and Chrome both key on.
+     Nothing is heard at the airport. All that changes is that the sangeet is
+     now allowed to start the track.
+
+     A viewer who never drags (the gate gives up after DRAG.fallback and the
+     film carries on) gets no music, and that is the intended trade: the
+     interaction model is one drag, and no stray tap anywhere else is
+     treated as an interaction. */
+  class Track {
+    constructor(src, volume = .4, limit = 0) {
+      this.src = src;
+      this.volume = volume;
+      this.limit = limit;        // seconds of the file this film uses (0 = all)
+      this.el = null;
+      this.state = 'off';
+      this.blessed = false;      // has the drag bought playback permission?
+      this.blessing = false;
+      this.log = null;           // set by ?debug=1
+    }
+
+    /* Built on first use, then kept — the same element for the film's life,
+       so resuming continues from the position it was paused at. */
+    node() {
+      if (!this.el) {
+        const a = new Audio();
+        a.preload = 'auto';
+        a.loop = false;
+        a.volume = clamp(this.volume);
+        a.src = this.src;
+        this.el = a;
+      }
+      return this.el;
+    }
+
+    /* Start fetching early — the file is megabytes and the music is due
+       mid-film, so the network should never be what makes it late. */
+    prime() {
+      const a = this.node();
+      if (a.load) a.load();
+    }
+
+    say(...m) { if (this.log) console.log('[audio]', ...m); }
+
+    /* The only method the director calls. `want` is "the film is inside the
+       stretch that has music"; `running` is "the film is advancing at all". */
+    update(want, running) {
+      if (want && running) {
+        /* only the first `limit` seconds of the file are this film's */
+        if (this.limit && this.el && this.el.currentTime >= this.limit) {
+          if (!this.el.paused) this.el.pause();
+          if (this.state !== 'capped') this.say('capped at', this.limit + 's');
+          this.state = 'capped';
+          return;
+        }
+        if (this.state === 'off' || this.state === 'held') this.play();
+        return;                  // playing / blocked / capped all wait
+      }
+      if (want) {
+        if (this.state === 'playing') this.hold();
+        return;                  // paused mid-sequence: keep the position
+      }
+      if (this.state !== 'off') this.stop();
+    }
+
+    play() {
+      const a = this.node();
+      const fresh = this.state !== 'held';     // a resume keeps its position
+      if (fresh) { try { a.currentTime = 0; } catch (e) { /* not seekable */ } }
+      a.muted = false;
+      a.volume = clamp(this.volume);
+      this.state = 'playing';
+      const p = a.play();
+      this.say('play()', fresh ? 'from 0' : 'resume at ' + a.currentTime.toFixed(2));
+      /* Only ever a .catch on `p` itself — chaining a .then here would leave
+         the rejection unhandled and log a page error on every refusal. */
+      if (p && p.catch) p.catch(err => {
+        if (this.state !== 'playing') return;  // stopped while play() settled
+        this.state = 'blocked';
+        this.say('refused (' + err.name + ') — the airport drag was not taken');
+      });
+    }
+
+    hold() {
+      if (this.el) this.el.pause();
+      this.state = 'held';
+    }
+
+    /* The sequence ended, or the film reset: silence, and back to the top. */
+    stop() {
+      if (this.el) {
+        this.el.pause();
+        try { this.el.currentTime = 0; } catch (e) { /* not seekable yet */ }
+      }
+      this.say('stop');
+      this.state = 'off';
+    }
+
+    /* Called from inside the airport drag, and from nowhere else. A muted
+       play()/pause() within that gesture: silent, instant, invisible, and
+       afterwards the element may be started from script at any time.
+
+       Cheap and idempotent on purpose — the drag hands it several pointer
+       events and it runs on them until one sticks. */
+    bless() {
+      /* `blessing` matters: play() settles a tick later, so without it the
+         pointerdown and the pointerup of one drag both run this. */
+      if (this.blessing || this.blessed) return;
+      if (this.state === 'playing' || this.state === 'held') return;
+      /* Only reachable if the clock was scrubbed past the airport: the music
+         is already due, so this gesture starts it outright. */
+      if (this.state === 'blocked') { this.blessed = true; this.play(); return; }
+      const a = this.node();
+      this.blessing = true;
+      a.muted = true;
+      const settle = () => {
+        this.blessed = true;
+        this.blessing = false;
+        a.muted = false;
+        a.volume = clamp(this.volume);
+        /* Guard: if the celebrations somehow began while this settled, the
+           real playback owns the element now — do not rewind it. */
+        if (this.state === 'playing' || this.state === 'held') return;
+        a.pause();
+        try { a.currentTime = 0; } catch (e) { /* not seekable */ }
+        this.say('unlocked by the airport drag');
+      };
+      const p = a.play();
+      if (p && p.then) p.then(settle, () => {          // refused: try again on
+        a.muted = false;                               // the next drag event
+        this.blessing = false;
+      });
+      else settle();
+    }
+  }
+
+  return { clamp, lerp, ease, p, pl, on, life, q, hops, bob, Stage, Track };
 })();
 
 window.E = E;
