@@ -71,8 +71,6 @@ const CONFIG = {
     celebrations: 24,
   },
 
-  /* Seconds the card can be out of frame before the story resets. */
-  RESET_AFTER_LOST: 2.5,
   /* Pause at the end before the film loops. */
   LOOP_GAP: 1.6,
 
@@ -330,7 +328,7 @@ const CONFIG = {
        raising `scale` above, which would enlarge the panels while leaving
        the depths where they are and flatten the diorama out. The rise
        animation multiplies into this, so its timing is unaffected. */
-    dioramaScale: 1.8,
+    dioramaScale: 0.6,
     smoothing: { count: 5, tolerance: 0.02, threshold: 5 },
   },
 };

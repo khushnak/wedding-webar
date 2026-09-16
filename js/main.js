@@ -75,13 +75,16 @@
 
   const director = {
     time: START_AT,
-    playing: PREVIEW,      // preview starts immediately; AR waits for the card
-    lostFor: 0,
+    playing: PREVIEW,      // preview starts immediately; AR waits for tap + marker
+    /* Whether the marker is currently considered tracked. Debounced by the
+       same grace timer as playback (see buildScene), so it drives the rise/
+       sink visual without flickering on a brief tracking blip. Kept apart
+       from `playing` because the film can be visible-but-paused: found for
+       the first time and waiting on the user's tap. */
+    found: PREVIEW,
     lastDraw: -1,
 
-    reset() { this.time = START_AT; this.lastDraw = -1; },
-
-    play() { this.playing = true; this.lostFor = 0; },
+    play() { this.playing = true; },
 
     pause() { this.playing = false; },
 
@@ -198,26 +201,77 @@
       </a-scene>`;
 
     const marker = el('marker');
+    const hintTitle = el('hint-title');
+    const hintSub = el('hint-sub');
+    const POINT_TITLE = hintTitle.textContent;
+    const POINT_SUB = hintSub.textContent;
+
+    /* Has the user tapped to begin yet? Only the first qualifying tap does
+       anything (see onTap below) — every requirement about starting and
+       resuming reduces to keeping `playing` in sync with (started && found). */
+    let started = false;
+
+    function showTapHint() {
+      hintTitle.textContent = 'Tap to begin';
+      hintSub.textContent = 'Tap anywhere on the screen to start the story.';
+      el('hint').hidden = false;
+    }
+    function showPointHint() {
+      hintTitle.textContent = POINT_TITLE;
+      hintSub.textContent = POINT_SUB;
+      el('hint').hidden = false;
+    }
+    function syncPlaying() {
+      if (started && director.found) director.play();
+      else director.pause();
+    }
+
     /* AR.js's own frame-by-frame detection can miss a frame from motion
        blur or a brief partial occlusion during normal handheld movement,
        firing a markerLost immediately followed by markerFound. Without
-       this grace window every such blip paused (and visibly dipped) the
-       animation, which read as "restarting" on the smallest phone
-       movement. Debouncing the pause absorbs short blips; a real loss
-       (card moved away, out of frame) still pauses/resets as before. */
+       this grace window every such blip paused the animation (and, before
+       tap-to-start existed, visibly dipped it), which read as "restarting"
+       on the smallest phone movement. The debounce sits on `director.found`
+       itself — not just on pause — so both the rise/sink visual and
+       playback stay untouched by a blip shorter than the grace window; a
+       real loss (card moved away, out of frame) still hides/pauses. */
     const LOST_GRACE_MS = 300;
     let lostTimer = null;
+
     marker.addEventListener('markerFound', () => {
       clearTimeout(lostTimer);
       lostTimer = null;
-      el('hint').hidden = true;
-      if (!director.playing) director.reset();
-      director.play();
+      director.found = true;
+      if (started) el('hint').hidden = true;   // resuming: no new tap needed
+      else showTapHint();                       // first time: shown, but waits
+      syncPlaying();
     });
+
     marker.addEventListener('markerLost', () => {
       clearTimeout(lostTimer);
-      lostTimer = setTimeout(() => director.pause(), LOST_GRACE_MS);
+      lostTimer = setTimeout(() => {
+        director.found = false;      // AR.js also hides the object3D itself
+        if (!started) showPointHint();
+        else el('hint').hidden = true;   // already running: resumes silently on re-find
+        syncPlaying();                    // pauses at the exact current time — no reset
+      }, LOST_GRACE_MS);
     });
+
+    /* Tap-to-start. A plain 'click' (not touchstart/pointerdown) is used
+       deliberately: it never needs preventDefault, so it cannot interfere
+       with anything AR.js binds for its own camera/canvas handling, and it
+       does not trigger a navigation or reload since nothing here is a link
+       or form. Only counts while the marker is actually visible, so an
+       incidental tap before the card is ever found (adjusting the phone,
+       dismissing browser chrome) does no harm; only the first such tap
+       does anything. */
+    function onTap() {
+      if (started || !director.found) return;
+      started = true;
+      el('hint').hidden = true;
+      syncPlaying();
+    }
+    document.addEventListener('click', onTap);
   }
 
   function registerComponent() {
@@ -295,8 +349,10 @@
         const dt = Math.min(.1, (now - this.last) / 1000);
         this.last = now;
 
-        /* content rises out of the card the moment it is found */
-        const target = director.playing ? 1 : 0;
+        /* content rises out of the card the moment the marker is tracked —
+           independent of whether playback has actually started yet, so the
+           diorama is visibly anchored while it waits for the first tap */
+        const target = director.found ? 1 : 0;
         this.rise += (target - this.rise) * Math.min(1, dt * (target ? 4.5 : 9));
         const r = E.ease.back(E.clamp(this.rise));
         /* the whole diorama rises and grows as one, depth spacing intact —
@@ -306,11 +362,10 @@
         const op = E.clamp(this.rise * 1.6);
         for (const p of this.panels) p.mesh.material.opacity = op;
 
-        if (!director.playing) {
-          director.lostFor += dt;
-          if (director.lostFor > C.RESET_AFTER_LOST) director.reset();
-          return;
-        }
+        /* Not (yet) playing: either waiting on the first tap, or paused on
+           a lost marker. Either way, freeze exactly here — no reset, no
+           time movement — so the next play() resumes at this same time. */
+        if (!director.playing) return;
         director.advance(dt);
         /* Only re-upload panels that actually painted this frame — an empty
            midground costs nothing in scenes that have none. The wasDirty
