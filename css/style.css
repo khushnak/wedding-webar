@@ -22,6 +22,18 @@
 
 * { box-sizing: border-box; }
 
+/* The `hidden` attribute must actually win.
+   The browser's own sheet says [hidden] { display: none }, but that is only
+   (0,1,0) specific, so ANY rule here that sets `display` on an id or class
+   silently beats it and the element stays on screen with hidden="" set.
+   That is exactly what put REPLAY and END AR on screen from page load:
+   #ending-ui declares `display: flex` (1,0,0) and .ui-row declares it too
+   (same weight, later in the file), so both outranked [hidden] while the
+   JS below went on believing the attribute was doing its job.
+   All the show/hide logic in main.js drives `.hidden`, so make it
+   authoritative once, here, rather than patching each element. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;
@@ -130,6 +142,34 @@ body:not(.preview) #loader { color: var(--cream); }
 }
 
 #hint { animation: float-up 420ms ease-out both; }
+#hint-sub { white-space: pre-line; }
+
+/* Pre-story screen only: opaque from its first frame, including rotation. */
+#overlay > #hint.start-card {
+  position: fixed;
+  inset: 0;
+  max-width: none;
+  padding: max(20px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
+           max(20px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--marigold);
+  color: var(--ink);
+  text-shadow: none;
+  animation: none;
+}
+#hint.start-card .hint-title {
+  max-width: 24ch;
+  margin: 0;
+  font-size: clamp(1.7rem, 6vh, 3rem);
+  line-height: 1.1;
+}
+#hint.start-card .hint-sub { max-width: 38ch; opacity: 1; }
+#hint.start-card #hint-volume { font-size: .8rem; }
+#btn-begin:disabled { opacity: .6; cursor: default; }
 
 @keyframes float-up {
   from { opacity: 0; transform: translateY(10px); }
@@ -192,7 +232,7 @@ body:not(.preview) #loader { color: var(--cream); }
 /* #overlay > div caps its children at 22rem for the hint paragraph, and
    that leaked onto this card. It has to be beaten on specificity — a plain
    `#travel { max-width: none }` is (1,0,0) and loses to (1,0,1). */
-#overlay > #travel { max-width: none; }
+#overlay > #travel { max-width: none; text-shadow: none; }
 
 @keyframes travel-in {
   from { opacity: 0; transform: translateX(-50%) translateY(10px); }
@@ -209,6 +249,7 @@ body:not(.preview) #loader { color: var(--cream); }
 }
 
 .travel-arrow { margin-left: .15em; }
+.travel-context { margin-bottom: 6px; font-size: .82rem; }
 
 /* the track ------------------------------------------------------------- */
 .travel-track {
@@ -235,13 +276,14 @@ body:not(.preview) #loader { color: var(--cream); }
 /* solid marigold behind the journey already travelled */
 .travel-fill {
   left: 0;
-  width: 0;
+  width: var(--travel-progress, 0%);
   background: var(--marigold);
   transition: width 260ms ease-out;
 }
 
 .travel-dots i {
   position: absolute;
+  left: var(--stop);
   top: 50%;
   width: 11px; height: 11px;
   margin: -5.5px 0 0 -5.5px;
@@ -256,7 +298,7 @@ body:not(.preview) #loader { color: var(--cream); }
 .travel-plane {
   position: absolute;
   top: 50%;
-  left: 0;
+  left: var(--travel-progress, 0%);
   width: 46px;
   height: auto;
   margin-top: -23px;
@@ -298,3 +340,179 @@ body:not(.preview) #loader { color: var(--cream); }
   .travel-track { height: 32px; }
   .travel-plane { width: 38px; margin-top: -19px; margin-left: -19px; }
 }
+
+/* Landscape: bottom text and a narrow right-edge downward drag rail.
+   Keep the transparent screen-space wrapper out of the pointer hit area. */
+@media (orientation: landscape) {
+  #travel {
+    --travel-rail-height: min(50vh, 240px, calc(100vh - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    /* Explicit viewport bounds avoid shrink-to-content sizing in #overlay's
+       end-aligned grid. Children below are fixed to the screen themselves. */
+    inset: 0 auto auto 0;
+    width: 100vw;
+    width: 100dvw;
+    height: 100vh;
+    height: 100dvh;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    transform: none;
+    pointer-events: none;
+    animation-name: travel-in-landscape;
+  }
+  #travel .travel-copy {
+    position: fixed;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: calc(100% - 2 * max(24px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)));
+    padding: 6px 12px;
+    background: #fff;
+    pointer-events: auto;
+  }
+  #travel .travel-copy, #travel .travel-copy * {
+    text-shadow: none;
+    filter: none;
+    box-shadow: none;
+    outline: none;
+    -webkit-text-stroke: 0;
+  }
+  #travel .travel-title { margin-bottom: 4px; line-height: 1.2; }
+  #travel .travel-context { margin-bottom: 3px; }
+  #travel .travel-title:last-child { margin-bottom: 0; }
+  #travel .travel-track, #travel .travel-labels {
+    position: fixed;
+    top: calc((100vh - var(--travel-rail-height) + env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 2 + 8px);
+    top: calc((100dvh - var(--travel-rail-height) + env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 2 + 8px);
+    bottom: auto;
+  }
+  #travel .travel-track {
+    right: calc(72px + env(safe-area-inset-right, 0px));
+    width: 44px;
+    height: var(--travel-rail-height);
+    margin: 0;
+    pointer-events: auto;
+  }
+  #travel .travel-line, #travel .travel-fill {
+    top: 0;
+    left: 50%;
+    right: auto;
+    width: 3px;
+    margin: 0 0 0 -1.5px;
+  }
+  #travel .travel-line {
+    height: 100%;
+    background: repeating-linear-gradient(to bottom,
+      rgba(36, 29, 24, .28) 0 7px, transparent 7px 14px);
+  }
+  #travel .travel-fill {
+    height: var(--travel-progress, 0%);
+    transition: height 260ms ease-out;
+  }
+  #travel .travel-dots i { left: 50%; top: var(--stop); }
+  #travel .travel-plane {
+    top: var(--travel-progress, 0%);
+    left: 50%;
+    width: 38px;
+    height: 48px;
+    margin: -48px 0 0 -19px;
+    filter: none;
+    transition: top 300ms cubic-bezier(.3, .9, .35, 1);
+  }
+  #travel.dragging .travel-plane { transition: none; }
+  #travel .travel-labels {
+    right: calc(8px + env(safe-area-inset-right, 0px));
+    width: 64px;
+    height: var(--travel-rail-height);
+    margin: 0;
+    display: block;
+  }
+  #travel .travel-labels li {
+    position: absolute;
+    top: var(--stop);
+    transform: translateY(-50%);
+    text-align: left;
+  }
+  @supports (height: 100dvh) {
+    #travel {
+      --travel-rail-height: min(50dvh, 240px, calc(100dvh - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    }
+  }
+}
+
+@keyframes travel-in-landscape {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ==========================================================================
+   ENDING CONTROLS — screen UI
+   Same footing as #travel: fixed to the viewport, never part of the AR world.
+   ========================================================================== */
+
+#ending-ui {
+  position: fixed;
+  left: 50%;
+  bottom: calc(26px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: min(92vw, 27rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  pointer-events: auto;
+  z-index: 20;
+}
+/* the hint card's 22rem cap is meant for the paragraph, not for these */
+#overlay > #ending-ui { max-width: none; }
+
+.ui-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+/* WHITE ONLY. No border, no stroke, no outline, no coloured edge — the
+   shadow does the lifting, so nothing draws a line around the button. */
+.ui-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  border-width: 0;
+  border-style: none;
+  outline: 0;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .26);
+  background: #ffffff;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+  font-size: .92rem;
+  letter-spacing: .08em;
+  /* comfortably past the 44px minimum touch target */
+  min-height: 52px;
+  padding: 15px 30px;
+  border-radius: 999px;
+  text-shadow: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.ui-btn:focus,
+.ui-btn:focus-visible { outline: 0; box-shadow: 0 8px 22px rgba(0, 0, 0, .26); }
+.ui-btn:active { transform: translateY(1px); }
+.ui-row .ui-btn { flex: 1; max-width: 12rem; }
+
+/* NOT travel-in — that one ends on translateX(-50%), which centres a
+   fixed-position card but would shove this flex child half its width to the
+   left. This one touches opacity and Y only. */
+@keyframes ui-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+#btn-kiss, #ending-final { animation: ui-in 280ms ease-out both; }
