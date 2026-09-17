@@ -13,7 +13,6 @@ transparent PNGs into assets/ using the same filenames).
 
 import argparse
 import os
-
 import numpy as np
 from PIL import Image, ImageFilter
 from scipy import ndimage

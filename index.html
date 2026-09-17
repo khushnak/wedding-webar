@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Caveat:wght@600;700&family=Modak&family=Patrick+Hand&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="css/style.css?v=60">
+<link rel="stylesheet" href="css/style.css?v=63">
 </head>
 <body>
 
@@ -35,6 +35,8 @@
   <div id="hint" hidden>
     <p class="hint-title" id="hint-title">Point your camera at the invitation</p>
     <p class="hint-sub" id="hint-sub">Hold the card flat and fill about half the screen.</p>
+    <button id="btn-begin" class="ui-btn" type="button" hidden>TAP TO BEGIN</button>
+    <p class="hint-sub" id="hint-volume" hidden>TURN UP YOUR VOLUME 🔊</p>
   </div>
 
   <!--
@@ -47,17 +49,37 @@
     director's next gate, which is what advances the AR.
   -->
   <div id="travel" hidden>
-    <p class="travel-title">DRAG TO TRAVEL <span class="travel-arrow" aria-hidden="true">&#8594;</span></p>
+    <div class="travel-copy">
+    <p class="travel-title travel-context">TRAVEL FRANCE WITH RAHUL &amp; ARYA</p>
+    <p class="travel-title"><span id="travel-instruction">DRAG TO TRAVEL</span> <span id="travel-arrow" class="travel-arrow" aria-hidden="true">&#8594;</span></p>
+    </div>
     <div class="travel-track" id="travel-track">
       <div class="travel-line" aria-hidden="true"></div>
       <div class="travel-fill" id="travel-fill" aria-hidden="true"></div>
       <div class="travel-dots" id="travel-dots" aria-hidden="true"></div>
-      <img class="travel-plane" id="travel-plane" src="assets/icons/airplane.png"
-           alt="" draggable="false">
+      <picture>
+        <source media="(orientation: landscape)" srcset="assets/icons/airplane-top-down.svg?v=2">
+        <img class="travel-plane" id="travel-plane" src="assets/icons/airplane.png"
+             alt="" draggable="false">
+      </picture>
     </div>
     <ul class="travel-labels" id="travel-labels">
       <li>SEINE</li><li>LOUVRE</li><li>EIFFEL</li>
     </ul>
+  </div>
+
+  <!--
+    ENDING CONTROLS — screen UI, same rules as #travel above: outside
+    #ar-root, no marker transform, painted by the browser and not onto any
+    diorama canvas, so they hold still on the glass while the film stays on
+    the card.
+  -->
+  <div id="ending-ui" hidden>
+    <button id="btn-kiss" class="ui-btn" type="button" hidden>TAP TO KISS</button>
+    <div id="ending-final" class="ui-row" hidden>
+      <button id="btn-replay" class="ui-btn" type="button">REPLAY</button>
+      <button id="btn-end" class="ui-btn" type="button">END AR</button>
+    </div>
   </div>
 
   <div id="error" hidden>

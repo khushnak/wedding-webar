@@ -186,8 +186,19 @@ const CONFIG = {
     keys: {
       background: ['gardenBg', 'collegeBg', 'airportBg', 'riverBg', 'louvreBg',
                    'eiffelBg', 'roadEnding', 'vacationBg', 'roadBg'],
-      midground: ['gardenMid', 'collegeMid', 'airportMid'],
-      foreground: ['gardenFg', 'collegeFg', 'airportFg', 'riverFg', 'louvreFg', 'eiffelFg', 'roadFg'],
+      /* riverFg and roadFg are deliberately in the MIDGROUND, not the
+         foreground. Every other *Fg is scenery that genuinely stands in
+         front of the couple, but these two are what the couple are ON: the
+         Seine's "foreground" IS the boat they ride in, and roadFg is the
+         road they stand on. Left on the foreground panel at z +0.22 they
+         rendered in front of the characters plane at z 0, so the hull
+         covered the couple and the road covered their feet. Moving just
+         these two back one panel (z -0.30) puts them behind the characters,
+         giving background -> midground/boat -> characters for these scenes
+         only. Nothing else moves: the four-panel architecture, the depth
+         values and every other scene's ordering are untouched. */
+      midground: ['gardenMid', 'collegeMid', 'airportMid', 'riverFg', 'roadFg'],
+      foreground: ['gardenFg', 'collegeFg', 'airportFg', 'louvreFg', 'eiffelFg'],
     },
     depth: {
       background: -0.55,
@@ -414,6 +425,18 @@ const CONFIG = {
     strings: 'icons/strings.webp',
     chandelier: 'icons/chandeliar.webp',
 
+    /* Scene 9, the ride away. These three keys were already referenced by
+       LAYERS.keys and PRELOAD_NEXT below, and by ending() in scenes.js, but
+       the ASSETS entries that give them a FILE were missing — so the keys
+       resolved to undefined, loadKeys() skipped them without a request (no
+       404 to notice), and sprite() drew nothing because img(key) came back
+       undefined. That is why TAP TO KISS appeared over an empty scene: the
+       DOM button is independent of the artwork, and every failure in the
+       image path is silent by design. */
+    roadEnding: 'background/road_ending.webp',
+    ending1: 'characters/ending_1.webp',
+    ending2: 'characters/ending_2.webp',
+
     coupleSangeet: 'characters/couple_sangeet.webp',
     coupleReception: 'characters/couple_reception.webp',
 
@@ -486,7 +509,18 @@ const CONFIG = {
        source aspect ratio AND the four panels' relative depth spacing.
        At 35 degrees their combined footprint is about 285 x 141.40 mm,
        comfortably within 297 x 210 mm, including the print's 10 mm offset. */
-    dioramaScale: 1.8,
+    /* Physical size of the whole diorama, in marker widths. At 1.8 the film
+       spanned ~8 marker widths (about 74 cm off a 92 mm marker), which is
+       why the phone had to be held far enough back that tracking started
+       dropping. 1.8 -> 1.35 was not enough on the handset, so this is now
+       1.15: about 5.1 marker widths, roughly 47 cm off a 92 mm marker, some
+       36% smaller than the original. The composition, the 16:9 ratio, the
+       35 deg tilt and the four-panel depths are all untouched — the whole
+       group is simply smaller, so the same framing is reached from
+       noticeably closer to the card, which is also what keeps the marker
+       inside the camera's view. Depth spacing scales with it, so the
+       parallax keeps its proportions. */
+    dioramaScale: 1.15,
     /* No extra vertical lift: story-plane already offsets the tilted
        half-height so the settled bottom edge rests at the clearance above.
        The old .26 added 35.88 mm above that clearance. AR-only. */

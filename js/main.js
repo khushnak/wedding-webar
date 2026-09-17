@@ -49,16 +49,21 @@
      it is story time, not wall-clock: the paris drag gates stop the clock,
      and the music waits with it. */
   const MUSIC_AT = (() => {
-    const i = SCENES.findIndex(s => s.id === 'celebrations');
+    /* Anchored on PARIS, whose very first frame IS the airport
+       (PA_AIRPORT_T0 === 0 in scenes.js) — not on the celebrations, where it
+       used to begin. The track now opens as the couple reach the airport and
+       runs unbroken to the last frame of the film:
+         Airport -> Seine -> Louvre -> Eiffel -> Proposal
+                 -> Sangeet -> Wedding -> Reception -> Ending
+       It is still ONE window, therefore still ONE play(). Nothing between
+       those two boundaries ever leaves the window, so no scene change and no
+       travel leg can restart it or touch currentTime. */
+    const i = SCENES.findIndex(s => s.id === 'paris');
     if (i < 0) return null;
-    /* ?scene=celebrations previews the sequence on its own clock; any other
-       single-scene preview is one of the silent scenes. */
-    /* The window now runs from the first frame of the celebrations to the
-       LAST frame of the film — the ending rides away under the same track,
-       so the music neither stops when the couple appear nor restarts when
-       they kiss. One window, one play(), exactly as before; only longer. */
+    /* ?scene=paris|celebrations|ending each preview on their own clock; any
+       other single-scene preview is one of the silent scenes. */
     if (ONLY) {
-      if (ONLY === 'celebrations' || ONLY === 'ending') {
+      if (ONLY === 'paris' || ONLY === 'celebrations' || ONLY === 'ending') {
         return { from: 0, to: SCENES.find(x => x.id === ONLY).dur };
       }
       return null;
@@ -66,14 +71,21 @@
     const from = SCENES.slice(0, i).reduce((a, s) => a + s.dur, 0);
     return { from, to: SCENES.reduce((a, s) => a + s.dur, 0) };
   })();
-  /* The film uses only the opening stretch of the file — exactly as many
-     seconds as the celebrations scene is long, so the music can never run on
-     past the picture even if the mp3 is minutes longer (this one is 346s). */
+  /* The film uses only the opening stretch of the file, so the music can
+     never run on past the picture even though the mp3 is minutes longer
+     (this one is 355s). */
   /* The cap is the window plus slack. Story time STOPS at the kiss gate
      while the viewer decides, but the audio playhead does not — without the
      slack a long pause there would run the track into its limit and cut the
      music off mid-scene. */
-  const MUSIC_SLACK = 45;
+  /* Every gate inside the window freezes STORY time while the audio keeps
+     running, so the playhead legitimately gets ahead of the clock by however
+     long the viewer takes over each drag. The window now spans the three
+     travel gates AND the kiss gate rather than the kiss alone, so the
+     allowance is raised to match — without it a leisurely viewer would reach
+     the cap and the music would cut out mid-film. 49.2 + 90 is still far
+     inside the 355s file. */
+  const MUSIC_SLACK = 90;
   const music = (MUSIC_AT && C.AUDIO && C.AUDIO.celebrations)
     ? new E.Track(C.AUDIO.celebrations, C.AUDIO.volume,
                   MUSIC_AT.to - MUSIC_AT.from + MUSIC_SLACK)
@@ -694,7 +706,15 @@
       hintSub.textContent = 'ROTATE YOUR PHONE FOR A BETTER EXPERIENCE';
       el('hint').classList.add('start-card');
       el('btn-begin').hidden = false;
-      el('btn-begin').disabled = !director.found;
+      /* Deliberately NOT disabled on !director.found. Rotating the phone
+         tears down and rebuilds AR.js's camera and projection, which fires
+         markerLost, and this card is redrawn with the marker momentarily
+         gone — so gating the button on tracking meant that turning the phone
+         to landscape, exactly what the card asks for, greyed out the only
+         control on screen. Nothing is lost by allowing the tap: the story
+         clock is gated separately in syncPlaying(), which starts the film
+         only once `started && found`. */
+      el('btn-begin').disabled = false;
       el('hint-volume').hidden = false;
       el('hint').hidden = false;
     }
@@ -756,7 +776,14 @@
        dismissing browser chrome) does no harm; only the first such tap
        does anything. */
     function onTap() {
-      if (started || !director.found) return;
+      /* The marker is NOT required here any more. Arming the story and
+         RUNNING it are two different things: this only arms it, and
+         syncPlaying() below still refuses to advance the clock until the
+         card is in view. So a viewer can read the card, turn the phone,
+         tap, and then take as long as they like to frame the invitation —
+         the film sits at t=0 until they do, and Scene 1 always plays from
+         its first frame. No delay, no second tap, no change to Scene 1. */
+      if (started) return;
       started = true;
       /* Buy the browser's permission to play audio here, on the tap that
          starts the film. This is not a new interaction — it is the tap the
@@ -785,10 +812,14 @@
           if (request && request.catch) request.catch(() => {});
         } catch (err) { /* Continue the existing experience without fullscreen. */ }
       }
-      el('hint').hidden = true;
       el('hint').classList.remove('start-card');
       el('btn-begin').hidden = true;
       el('hint-volume').hidden = true;
+      /* Armed but not yet framed: keep a hint on screen telling them what to
+         do, instead of dropping them onto a bare camera feed. markerFound
+         hides it again (it already does `if (started) hint.hidden = true`). */
+      if (director.found) el('hint').hidden = true;
+      else showPointHint();
       playStartSound();
       syncPlaying();
     }
