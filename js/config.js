@@ -75,6 +75,10 @@ const CONFIG = {
     oneDay: 6.65,
     paris: 18.7,
     celebrations: 24,
+    /* The ride away. Holds at 1.6s for the TAP TO KISS gate (the clock stops
+       there, so this length is what plays, not what the viewer's pause
+       adds), then rides out to the REPLAY / END AR buttons. */
+    ending: 6.5,
   },
 
   /* Seconds the card can be out of frame before the story resets. */
@@ -157,7 +161,8 @@ const CONFIG = {
   LAYERS: {
     order: ['background', 'midground', 'characters', 'foreground'],
     keys: {
-      background: ['gardenBg', 'collegeBg', 'airportBg', 'riverBg', 'louvreBg', 'eiffelBg'],
+      background: ['gardenBg', 'collegeBg', 'airportBg', 'riverBg', 'louvreBg',
+                   'eiffelBg', 'roadEnding'],
       midground: ['gardenMid', 'collegeMid', 'airportMid'],
       /* NOTE riverFg is deliberately NOT here. Every other *Fg is scenery
          standing in front of the couple, but the Seine's "foreground" IS the
@@ -238,6 +243,8 @@ const CONFIG = {
     'wedding1', 'wedding2',
     'sangeet1', 'sangeet2',
     'reception1', 'reception2',
+    /* the ending rides in right after the celebrations, so it queues with them */
+    'roadEnding', 'ending1', 'ending2',
   ],
 
   /* --------------------------------------------------------------- fonts */
@@ -382,6 +389,13 @@ const CONFIG = {
     strings: 'icons/strings.png',
     chandelier: 'icons/chandeliar.png',
 
+    /* The ending — the couple riding away. road_ending is a square 1254px
+       landscape; ending_1/ending_2 are the same 1156x1360 illustration in
+       two poses, the second mid-kiss, swapped on the tap. */
+    roadEnding: 'background/road_ending.png',
+    ending1: 'characters/ending_1.png',
+    ending2: 'characters/ending_2.png',
+
     coupleSangeet: 'characters/couple_sangeet.png',
     coupleReception: 'characters/couple_reception.png',
 
@@ -433,12 +447,11 @@ const CONFIG = {
        your invitation card at https://ar-js-org.github.io/AR.js/three.js/examples/marker-training/examples/generator.html */
     type: 'hiro',                        // 'hiro' | 'pattern'
     patternUrl: 'assets/marker/invite.patt',
-    /* How far the film's bottom edge sits above the card surface, and how
-       tall the standing plane is, in card widths. The plane's aspect ratio
-       always matches STAGE.w/STAGE.h (main.js computes it from that), so
-       it's landscape now. It stands upright, perpendicular to the card
-       (see story-plane in main.js), not floating flat above it. */
-    height: 1.45,
+    /* One marker unit represents the printed 92 mm Hiro square, NOT the
+       297 mm paper width. story-plane uses height * 0.05 as clearance;
+       this gives a 2 mm gap above the card when frameLift is zero.
+       scale is the unscaled panel height; width follows STAGE.w/STAGE.h. */
+    height: (2 / 92) / 0.05,
     scale: 2.5,
     /* Lean-back of the standing film, in degrees from vertical, hinged on
        the card's own left-right axis. The plane's face normal ends up this
@@ -449,32 +462,17 @@ const CONFIG = {
        deg above the card; raise toward 45 to favour steeper, more overhead
        viewing, lower it toward 0 to favour a flatter, eye-level look. */
     tiltDeg: 35,
-    /* Overall size of the whole diorama on screen. This is a uniform scale
-       on the group that carries every panel, so panel size AND the depth
-       spacing in LAYERS.depth grow together — the composition is identical,
-       just bigger, and the parallax keeps its proportions. Prefer this over
-       raising `scale` above, which would enlarge the panels while leaving
-       the depths where they are and flatten the diorama out. The rise
-       animation multiplies into this, so its timing is unaffected. */
-    dioramaScale: 0.6,
-    /* AR-ONLY vertical framing, in plane heights. Nothing in the artwork is
-       mispositioned: "ONE DAY" sits at y 475 and "ON VACATION" at y 615 of a
-       941-tall stage, and the first flight path enters at y 640 — all of
-       which frame correctly in ?preview. What moves them is tiltDeg. The
-       panels lean back, so seen from a phone held above the card the lower
-       part of each panel is nearer the lens than the upper part, and
-       perspective magnifies it and carries it toward (and past) the bottom
-       of the screen. The title and the plane's entry arc both live in that
-       lower band, which is why they alone read as "too low" on a phone and
-       nowhere else.
-
-       Lifting the whole diorama is the fix that leaves every coordinate,
-       animation and pace alone: it raises the bottom band back into frame
-       for every scene at once. Raise it if content still sits low on your
-       phone, lower it toward 0 if the film starts floating off the card.
-       This is applied in story-plane (main.js), which only ever runs in AR,
-       so ?preview is untouched by it. */
-    frameLift: 0.26,
+    /* Use the landscape A4 width with 6 mm margins: 297 - 12 = 285 mm.
+       Divide target width in marker units by PlaneGeometry's width
+       (scale * STAGE.w / STAGE.h). Uniform group scaling preserves the
+       source aspect ratio AND the four panels' relative depth spacing.
+       At 35 degrees their combined footprint is about 285 x 141.40 mm,
+       comfortably within 297 x 210 mm, including the print's 10 mm offset. */
+    dioramaScale: ((297 - 2 * 6) / 92) / (2.5 * (1672 / 941)),
+    /* No extra vertical lift: story-plane already offsets the tilted
+       half-height so the settled bottom edge rests at the clearance above.
+       The old .26 added 35.88 mm above that clearance. AR-only. */
+    frameLift: 0,
     smoothing: { count: 5, tolerance: 0.02, threshold: 5 },
   },
 };

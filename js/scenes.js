@@ -1500,6 +1500,20 @@ const SCENES = (() => {
     const here = stop.full ? t >= PA_RAHUL_T0
       : t >= stop.t0 + PA_SLIDE_DUR + PA_SETTLE;
 
+    /* Travel ink and plane stay on the characters panel, but paint BEFORE
+       the couple, cases and foreground. Their artwork occludes the flight
+       in both preview and AR without changing its path, timing or depth. */
+    if (next) {
+      const hp = pl(q(t, C.STAGE.choppy), next.t0 - PA_LINE_DRAW, PA_LINE_DRAW);
+      if (hp > 0) {
+        const h = PA_HOPS[cur];
+        const head = g.trail(h.p0, h.cp, h.p1, hp, hopInk);
+        g.sprite('airplane', {
+          x: head.x, y: head.y, h: 92, anchor: 'center', rot: head.angle,
+        });
+      }
+    }
+
     /* THE EXCEPTION: at the Seine and the Louvre the foreground goes down
        first and the couple go over the top of it, so the boat and the
        courtyard furniture can never hide them. Everywhere else the
@@ -1544,35 +1558,6 @@ const SCENES = (() => {
     }
 
     if (!stop.front) drawStopFg(stop, fgProg);
-
-    /* The line OUT of here, drawn last so nothing can cover it. It lays
-       itself across the place they are still standing in — they stay in
-       frame while it does, so the journey reads as leaving somewhere rather
-       than cutting away from it — and then the clock holds on the finished
-       line while the viewer pulls it forward.
-
-       g.drag is 0..1, handed in by the director while a gate is open: the
-       plane at the head of the line eases forward under the finger, so the
-       gesture feels like it is moving the journey. It is not a second
-       animation; it is the same line and the same plane, nudged. */
-    /* Every leg is purely cinematic now: the line draws and the plane flies
-       it. The interaction that used to live here — the white paper patch,
-       the peeking plane and the handwritten "drag to travel" prompt, all
-       painted into the film itself — has moved off the artwork entirely and
-       onto the phone screen as a DOM card (#travel in index.html, driven by
-       initTravelUI in main.js). The clock still holds at every gate exactly
-       as it did; only the thing the viewer puts a finger on has changed, so
-       nothing here needs to publish a hit box any more. */
-    if (next) {
-      const hp = pl(q(t, C.STAGE.choppy), next.t0 - PA_LINE_DRAW, PA_LINE_DRAW);
-      if (hp > 0) {
-        const h = PA_HOPS[cur];
-        const head = g.trail(h.p0, h.cp, h.p1, hp, hopInk);
-        g.sprite('airplane', {
-          x: head.x, y: head.y, h: 92, anchor: 'center', rot: head.angle,
-        });
-      }
-    }
 
     /* the existing hand-off into Scene 7 */
     const sp = pl(t, PA_WIPE_T0, .5);
@@ -2058,6 +2043,64 @@ const SCENES = (() => {
     }
   }
 
+
+  /* ----------------------------------------- 9. the ride away ---------- */
+  /* road_ending is a SQUARE 1254px picture and the stage is 16:9, so it is
+     fitted to the frame's WIDTH and allowed to overflow downward — never
+     stretched. Pushing it below the frame by EN_BG_DY keeps the wide
+     foreground road at the bottom of shot while still leaving the horizon
+     and the narrowing road visible above it, which is the perspective the
+     couple has to sit inside.
+
+     They are deliberately BIG: EN_RIDE_H is 82% of the frame height, so the
+     scooter fills the wide part of the road rather than shrinking into the
+     landscape. Anchored 'bottom' at EN_RIDE_Y, their wheels land on the
+     foreground tarmac instead of floating over it. */
+  const EN_BG_DY = 250;                    // how far the square is pushed down
+  const EN_RIDE_H = 770;                   // 82% of the 941 stage height
+  const EN_RIDE_Y = 908;                   // wheels on the wide foreground road
+  const EN_IN = .75;                       // road settles / couple rides in
+  const EN_KISS_T = 1.60;                  // the hold, and the swap
+  const EN_GATES = [EN_KISS_T - .03];      // clock parks just before the swap
+
+  function ending(g, t) {
+    const bgW = C.STAGE.logicalW, bgH = C.STAGE.logicalH;
+
+    /* the road, on the back panel only — same gate every other scene uses */
+    if (g.on('background')) {
+      g.ctx.save();
+      g.ctx.fillStyle = P.sky;
+      g.ctx.fillRect(0, 0, bgW, bgH);
+      g.ctx.restore();
+    }
+    const rise = ease.out(pl(t, 0, EN_IN));
+    g.sprite('roadEnding', {
+      x: CX, y: bgH + EN_BG_DY + (1 - rise) * 90,
+      w: bgW, anchor: 'bottom', alpha: rise,
+    });
+
+    /* The couple. A discrete cutout swap on the kiss, exactly the stop-motion
+       language every other pose change in the film uses — no crossfade. The
+       gate above parks the clock at EN_KISS_T until the tap releases it, so
+       ending_1 holds for as long as the viewer takes. */
+    const kissed = t >= EN_KISS_T;
+    const grow = ease.back(clamp(pl(t, .12, EN_IN)));
+    g.sprite(kissed ? 'ending2' : 'ending1', {
+      x: CX, y: EN_RIDE_Y, h: EN_RIDE_H * (.72 + .28 * grow), anchor: 'bottom',
+    });
+
+    /* a small pop of sparkle on the kiss itself, then it clears */
+    if (kissed) {
+      const pop = life(t - EN_KISS_T, 0, 1.5, .28, .5);
+      if (pop > 0) {
+        g.sprite('sparkle', {
+          x: CX, y: EN_RIDE_Y - EN_RIDE_H * .74,
+          h: 250 * pop, anchor: 'center', alpha: clamp(pop * 1.4),
+        });
+      }
+    }
+  }
+
   /* ------------------------------------------------------------ playlist --- */
 
   const S = C.SCENE_SECONDS;
@@ -2072,6 +2115,10 @@ const SCENES = (() => {
        the director in main.js. Only this scene has them. */
     { id: 'paris', dur: S.paris, draw: paris, gates: PA_GATES },
     { id: 'celebrations', dur: S.celebrations, draw: celebrations },
+    /* The ride away. Its one gate is the TAP TO KISS hold — released by the
+       screen button in main.js through the same director.drag the travel
+       card uses, so there is no second interaction system. */
+    { id: 'ending', dur: S.ending, draw: ending, gates: EN_GATES },
   ];
 })();
 

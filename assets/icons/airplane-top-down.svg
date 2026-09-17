@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 80">
+  <!-- Symmetric top view, nose down; used only by the landscape UI handle. -->
+  <path d="M29 5 18 13V19L29 16V32L5 44V51L28 44V65Q28 74 32 78Q36 74 36 65V44L59 51V44L35 32V16L46 19V13L35 5Z"
+        fill="#b8362c" stroke="#241d18" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M29 61Q32 65 35 61L35 67Q32 70 29 67Z" fill="#f3efe6"/>
+  <path d="M30 8H34V28H30Z" fill="#e9a72c"/>
+</svg>
